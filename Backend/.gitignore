@@ -43,3 +43,4 @@ temp/
 
 # Optional lock files (keep if your team uses npm consistently)
 # package-lock.json
+/src/generated/prisma

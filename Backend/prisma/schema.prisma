@@ -27,7 +27,7 @@ model Plant {
   departments   Department[]
   users         User[]
   files         File[]
-  fileShares    FileShare[] @relation("PlantShares") // Added for relation
+  fileShares    FileShare[] @relation("PlantShares")
   
   // Metadata
   createdBy     String?
@@ -48,13 +48,13 @@ model Department {
   plant         Plant     @relation(fields: [plantId], references: [id])
   users         User[]
   files         File[]
-  fileShares    FileShare[] @relation("DeptShares") // Added for relation
+  fileShares    FileShare[] @relation("DeptShares")
   
   // Metadata
   createdBy     String?
   settings      Json?
 }
-//eiidofjwsroep
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -83,7 +83,7 @@ model User {
   sharedFiles   FileShare[]
   notifications Notification[]
   auditLogs     AuditLog[]
-  fileAccessLogs FileAccessLog[] // Added for relation
+  fileAccessLogs FileAccessLog[]
   
   // Created by
   createdBy     String?

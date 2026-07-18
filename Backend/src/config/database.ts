@@ -1,6 +1,5 @@
-// src/config/database.ts (for Prisma 6)
 import mysql from "mysql2/promise";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '../generated/prisma';
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -17,7 +16,7 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// Initialize Prisma Client (works with Prisma 6)
+// Initialize Prisma Client (works with Prisma)
 const prisma = new PrismaClient({
     log: process.env.NODE_ENV === 'development' 
         ? ['query', 'info', 'warn', 'error'] 

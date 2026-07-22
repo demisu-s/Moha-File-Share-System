@@ -1,9 +1,38 @@
-// src/routes/shareRoutes.ts
 import { Router } from 'express';
-const router = Router();
+import { ShareController } from '../controllers/shareController';
+import { authenticate } from '../middleware/auth';
 
-router.get('/', (req, res) => {
-    res.json({ message: 'Share routes - coming soon' });
-});
+const router = Router();
+const shareController = new ShareController();
+
+router.post(
+    '/',
+    authenticate,
+    shareController.createShare
+);
+
+router.get(
+    '/',
+    authenticate,
+    shareController.getAllShares
+);
+
+router.get(
+    '/:id',
+    authenticate,
+    shareController.getShareById
+);
+
+router.put(
+    '/:id',
+    authenticate,
+    shareController.updateShare
+);
+
+router.delete(
+    '/:id',
+    authenticate,
+    shareController.revokeShare
+);
 
 export default router;

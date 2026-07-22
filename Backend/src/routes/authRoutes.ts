@@ -1,4 +1,3 @@
-// src/routes/authRoutes.ts
 import { Router } from 'express';
 import { prisma } from '../config/database';
 import bcrypt from 'bcryptjs';
@@ -14,7 +13,7 @@ router.post('/login', async (req, res, next) => {
         const validated = loginSchema.parse(req.body);
         
         const user = await prisma.user.findUnique({
-            where: { email: validated.email }
+            where: { employeeId: validated.employeeId }
         });
 
         if (!user) {
@@ -33,13 +32,13 @@ router.post('/login', async (req, res, next) => {
         const token = jwt.sign(
             {
                 id: user.id,
-                email: user.email,
+                employeeId: user.employeeId,
                 role: user.role,
                 plantId: user.plantId,
                 departmentId: user.departmentId
             },
             process.env.JWT_SECRET!,
-            { expiresIn: '24h' }
+            { expiresIn: '90d' }
         );
 
         // Update last login
@@ -52,7 +51,7 @@ router.post('/login', async (req, res, next) => {
             token,
             user: {
                 id: user.id,
-                email: user.email,
+                employeeId: user.employeeId,
                 fullName: user.fullName,
                 role: user.role,
                 plantId: user.plantId,

@@ -1,4 +1,3 @@
-// src/middleware/errorHandler.ts
 import { Request, Response, NextFunction } from 'express';
 
 export class AppError extends Error {

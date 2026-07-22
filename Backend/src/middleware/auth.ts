@@ -1,37 +1,56 @@
-// src/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
+import { Role } from '../constants/roles';
+
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                id: string;
+                employeeId: string;
+                role: Role;
+                plantId?: string;
+                departmentId?: string;
+            };
+        }
+    }
+}
 
 export interface AuthRequest extends Request {
-    user?: {
+    user: {
         id: string;
-        email: string;
-        role: string;
+        employeeId: string;
+        role: Role;
         plantId?: string;
         departmentId?: string;
     };
 }
 
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = async (
+    req: Request, 
+    res: Response, 
+    next: NextFunction
+): Promise<void> => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
         
         if (!token) {
-            return res.status(401).json({ error: 'Authentication required' });
+            res.status(401).json({ error: 'Authentication required' });
+            return;
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
             id: string;
-            email: string;
-            role: string;
+            employeeId: string;
+            role: Role;
         };
 
         const user = await prisma.user.findUnique({
             where: { id: decoded.id },
             select: {
                 id: true,
-                email: true,
+                employeeId: true,
                 role: true,
                 plantId: true,
                 departmentId: true,
@@ -40,84 +59,104 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         });
 
         if (!user || !user.isActive) {
-            return res.status(401).json({ error: 'User not found or inactive' });
+            res.status(401).json({ error: 'User not found or inactive' });
+            return;
         }
 
-        req.user = user;
+        req.user = {
+            id: user.id,
+            employeeId: user.employeeId,
+            role: user.role as Role,
+            plantId: user.plantId || undefined,
+            departmentId: user.departmentId || undefined
+        };
+        
         next();
     } catch (error) {
         if (error instanceof jwt.JsonWebTokenError) {
-            return res.status(401).json({ error: 'Invalid token' });
+            res.status(401).json({ error: 'Invalid token' });
+            return;
         }
         if (error instanceof jwt.TokenExpiredError) {
-            return res.status(401).json({ error: 'Token expired' });
+            res.status(401).json({ error: 'Token expired' });
+            return;
         }
-        return res.status(500).json({ error: 'Authentication failed' });
+        res.status(500).json({ error: 'Authentication failed' });
     }
 };
 
-// Role-based authorization
-export const authorize = (...roles: string[]) => {
-    return (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authorize = (...roles: Role[]) => {
+    return (req: Request, res: Response, next: NextFunction): void => {
         if (!req.user) {
-            return res.status(401).json({ error: 'Authentication required' });
+            res.status(401).json({ error: 'Authentication required' });
+            return;
         }
         
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ 
+            res.status(403).json({ 
                 error: 'Insufficient permissions',
                 required: roles,
                 current: req.user.role
             });
+            return;
         }
         
         next();
     };
 };
 
-// Plant-level authorization
-export const requirePlantAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requirePlantAccess = async (
+    req: Request, 
+    res: Response, 
+    next: NextFunction
+): Promise<void> => {
     if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
+        res.status(401).json({ error: 'Authentication required' });
+        return;
     }
 
     const plantId = req.params.plantId || req.body.plantId;
     
     if (!plantId) {
-        return res.status(400).json({ error: 'Plant ID required' });
+        res.status(400).json({ error: 'Plant ID required' });
+        return;
     }
 
-    // Super admin has access to all plants
     if (req.user.role === 'SUPER_ADMIN') {
-        return next();
+        next();
+        return;
     }
 
-    // Check if user belongs to the plant
     if (req.user.plantId !== plantId) {
-        return res.status(403).json({ error: 'Access denied to this plant' });
+        res.status(403).json({ error: 'Access denied to this plant' });
+        return;
     }
 
     next();
 };
 
-// Department-level authorization
-export const requireDepartmentAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireDepartmentAccess = async (
+    req: Request, 
+    res: Response, 
+    next: NextFunction
+): Promise<void> => {
     if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
+        res.status(401).json({ error: 'Authentication required' });
+        return;
     }
 
     const departmentId = req.params.departmentId || req.body.departmentId;
     
     if (!departmentId) {
-        return res.status(400).json({ error: 'Department ID required' });
+        res.status(400).json({ error: 'Department ID required' });
+        return;
     }
 
-    // Super admin has access to all departments
     if (req.user.role === 'SUPER_ADMIN') {
-        return next();
+        next();
+        return;
     }
 
-    // Plant admin can access all departments in their plant
     if (req.user.role === 'PLANT_ADMIN') {
         const department = await prisma.department.findUnique({
             where: { id: departmentId },
@@ -125,14 +164,15 @@ export const requireDepartmentAccess = async (req: AuthRequest, res: Response, n
         });
         
         if (department && department.plantId === req.user.plantId) {
-            return next();
+            next();
+            return;
         }
     }
 
-    // Department head can only access their own department
     if (req.user.role === 'DEPARTMENT_HEAD' && req.user.departmentId === departmentId) {
-        return next();
+        next();
+        return;
     }
 
-    return res.status(403).json({ error: 'Access denied to this department' });
+    res.status(403).json({ error: 'Access denied to this department' });
 };

@@ -5,9 +5,21 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:5000/api", "type": "string" },
-    { "key": "token", "value": "", "type": "string" },
-    { "key": "sampleUserId", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sampleUserId",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -26,7 +38,7 @@
                   "    pm.collectionVariables.set('token', res.data.token);",
                   "    console.log('Token saved:', res.data.token);",
                   "} else {",
-                  "    console.warn('Login did not return a token — check the response body.');",
+                  "    console.warn('Login did not return a token \u2014 check the response body.');",
                   "}",
                   "",
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
@@ -38,16 +50,24 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"superadmin@moha.com\",\n  \"password\": \"SuperAdmin123!\"\n}"
+              "raw": "{\n  \"employeeId\": \"SA001\",\n  \"password\": \"SuperAdmin123!\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "Logs in and automatically saves the JWT into the {{token}} collection variable. Run this first before any request below."
           }
@@ -63,7 +83,7 @@
                   "const res = pm.response.json();",
                   "if (res.success && res.data && res.data.token) {",
                   "    pm.collectionVariables.set('token', res.data.token);",
-                  "    console.log('Employee token saved — use this to confirm role checks correctly return 403.');",
+                  "    console.log('Employee token saved \u2014 use this to confirm role checks correctly return 403.');",
                   "}"
                 ]
               }
@@ -72,16 +92,24 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"employee@moha.com\",\n  \"password\": \"Employee123!\"\n}"
+              "raw": "{\n  \"employeeId\": \"EMP001\",\n  \"password\": \"Employee123!\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "Logs in as a low-privilege Employee account. Overwrites {{token}} with an Employee-level token so you can confirm restricted routes correctly return 403. Check seed.ts for the exact seeded email/password if this fails."
           }
@@ -116,12 +144,19 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
             },
             "description": "Requires SUPER_ADMIN, PLANT_ADMIN, or DEPARTMENT_HEAD. Auto-saves the first returned user's id into {{sampleUserId}} for the next request."
           }
@@ -131,12 +166,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/users/{{sampleUserId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "{{sampleUserId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{sampleUserId}}"
+              ]
             },
             "description": "Uses {{sampleUserId}}, auto-filled by running 'Get All Users' first."
           }
@@ -146,8 +189,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -155,10 +204,65 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
             },
             "description": "Only usable once the createUser route from userController/userRoutes is wired up. Returns 409 if the email or employeeId already exists."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "stats"
+              ]
+            },
+            "description": "Scoped by role: SUPER_ADMIN sees everything, PLANT_ADMIN sees their plant, others see their department."
+          }
+        },
+        {
+          "name": "Get Recent Activity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/activity",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "activity"
+              ]
+            },
+            "description": "Recent audit log entries, scoped the same way as stats."
           }
         }
       ]

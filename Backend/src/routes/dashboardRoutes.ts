@@ -1,8 +1,11 @@
+// src/routes/dashboardRoutes.ts
 import { Router } from 'express';
+import { DashboardController } from '../controllers/dashboardController';
+import { authenticate } from '../middleware/auth';
+
 const router = Router();
 
-router.get('/', (req, res) => {
-    res.json({ message: 'Dashboard routes - coming soon' });
-});
+router.get('/stats', authenticate, DashboardController.getStats);
+router.get('/activity', authenticate, DashboardController.getActivity);
 
 export default router;

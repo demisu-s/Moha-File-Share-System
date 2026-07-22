@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "MOHA File Share System",
+    "description": "API testing collection for the MOHA File Share backend. Login automatically saves the JWT token, so every other request works without manual copy-pasting.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "sampleUserId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (Super Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data && res.data.token) {",
+                  "    pm.collectionVariables.set('token', res.data.token);",
+                  "    console.log('Token saved:', res.data.token);",
+                  "} else {",
+                  "    console.warn('Login did not return a token — check the response body.');",
+                  "}",
+                  "",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has a token', () => pm.expect(res.data.token).to.exist);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@moha.com\",\n  \"password\": \"SuperAdmin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Logs in and automatically saves the JWT into the {{token}} collection variable. Run this first before any request below."
+          }
+        },
+        {
+          "name": "Login (Employee - for testing 403s)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data && res.data.token) {",
+                  "    pm.collectionVariables.set('token', res.data.token);",
+                  "    console.log('Employee token saved — use this to confirm role checks correctly return 403.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"employee@moha.com\",\n  \"password\": \"Employee123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Logs in as a low-privilege Employee account. Overwrites {{token}} with an Employee-level token so you can confirm restricted routes correctly return 403. Check seed.ts for the exact seeded email/password if this fails."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data && res.data.length > 0) {",
+                  "        pm.collectionVariables.set('sampleUserId', res.data[0].id);",
+                  "        console.log('Saved sampleUserId:', res.data[0].id);",
+                  "    }",
+                  "    pm.test('No password field leaked', () => {",
+                  "        res.data.forEach(u => pm.expect(u.password).to.be.undefined);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "Requires SUPER_ADMIN, PLANT_ADMIN, or DEPARTMENT_HEAD. Auto-saves the first returned user's id into {{sampleUserId}} for the next request."
+          }
+        },
+        {
+          "name": "Get User By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{sampleUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{sampleUserId}}"]
+            },
+            "description": "Uses {{sampleUserId}}, auto-filled by running 'Get All Users' first."
+          }
+        },
+        {
+          "name": "Create User (SUPER_ADMIN / PLANT_ADMIN only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@moha.com\",\n  \"password\": \"NewUser123!\",\n  \"fullName\": \"New Test User\",\n  \"employeeId\": \"EMP-9001\",\n  \"role\": \"EMPLOYEE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "Only usable once the createUser route from userController/userRoutes is wired up. Returns 409 if the email or employeeId already exists."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 // src/seed.ts
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/prisma';
 import bcrypt from 'bcryptjs';
 import { ROLES } from './constants/roles';
 

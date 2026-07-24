@@ -10,6 +10,14 @@ import { ShareService } from '../services/shareService';
 export class ShareController {
     private shareService = new ShareService();
 
+    constructor() {
+        this.createShare = this.createShare.bind(this);
+        this.getAllShares = this.getAllShares.bind(this);
+        this.getShareById = this.getShareById.bind(this);
+        this.updateShare = this.updateShare.bind(this);
+        this.revokeShare = this.revokeShare.bind(this);
+    }
+
     async createShare(req: Request, res: Response, next: NextFunction) {
         try {
             const validated = fileShareSchema.parse(req.body);

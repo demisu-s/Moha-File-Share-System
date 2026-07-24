@@ -1,7 +1,7 @@
 // src/controllers/userController.ts
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database';
-import { registerSchema, updateUserSchema } from '../validators/authValidator';
+import { createUserSchema, updateUserSchema, changePasswordSchema } from '../validators/authValidator';
 import { successResponse, paginatedResponse } from '../utils/response';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -10,10 +10,20 @@ import bcrypt from 'bcryptjs';
 
 export class UserController {
     private userService = new UserService();
+    constructor() {
+        this.createUser = this.createUser.bind(this);
+        this.getAllUsers = this.getAllUsers.bind(this);
+        this.getUserById = this.getUserById.bind(this);
+        this.updateUser = this.updateUser.bind(this);
+        this.deleteUser = this.deleteUser.bind(this);
+        this.getProfile = this.getProfile.bind(this);
+        this.updateProfile = this.updateProfile.bind(this);
+        this.changePassword = this.changePassword.bind(this);
+    }
 
     async createUser(req: Request, res: Response, next: NextFunction) {
         try {
-            const validated = registerSchema.parse(req.body);
+            const validated = createUserSchema.parse(req.body);
             
             if (validated.plantId) {
                 const hasAccess = await this.userService.canManagePlant(
@@ -136,6 +146,8 @@ export class UserController {
                 if (!canAssignRole) {
                     throw new AppError(`You do not have permission to assign role: ${validated.role}`, 403);
                 }
+
+            
             }
 
             const updated = await this.userService.updateUser(id as string, validated);
@@ -206,7 +218,7 @@ export class UserController {
 
     async changePassword(req: Request, res: Response, next: NextFunction) {
         try {
-            const { currentPassword, newPassword } = req.body;
+            const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
             
             const user = await prisma.user.findUnique({
                 where: { id: req.user!.id }

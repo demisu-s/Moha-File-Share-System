@@ -10,6 +10,14 @@ import { DepartmentService } from '../services/departmentService';
 export class DepartmentController {
     private departmentService = new DepartmentService();
 
+    constructor() {
+        this.createDepartment = this.createDepartment.bind(this);
+        this.getAllDepartments = this.getAllDepartments.bind(this);
+        this.getDepartmentById = this.getDepartmentById.bind(this);
+        this.updateDepartment = this.updateDepartment.bind(this);
+        this.deleteDepartment = this.deleteDepartment.bind(this);
+    }
+
     async createDepartment(req: Request, res: Response, next: NextFunction) {
         try {
             const validated = createDepartmentSchema.parse(req.body);

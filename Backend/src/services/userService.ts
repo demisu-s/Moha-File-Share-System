@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { ROLES } from '../constants/roles';
+import { AppError } from '../middleware/errorHandler';
 
 export class UserService {
     async createUser(data: {
@@ -12,6 +13,17 @@ export class UserService {
         role?: string;
         createdBy: string;
     }) {
+        // Enforce singleton SUPER_ADMIN
+        if (data.role === 'SUPER_ADMIN') {
+            const existing = await prisma.user.findFirst({
+                where: { role: 'SUPER_ADMIN', isActive: true },
+                select: { id: true }
+            });
+            if (existing) {
+                throw new AppError('A Super Admin already exists. Only one Super Admin is allowed.', 409);
+            }
+        }
+
         return prisma.user.create({
             data: {
                 email: data.email,

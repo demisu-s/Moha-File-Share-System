@@ -12,6 +12,15 @@ import fs from 'fs';
 export class FileController {
     private fileService = new FileService();
 
+    constructor() {
+        this.uploadFile = this.uploadFile.bind(this);
+        this.getAllFiles = this.getAllFiles.bind(this);
+        this.getFileById = this.getFileById.bind(this);
+        this.downloadFile = this.downloadFile.bind(this);
+        this.updateFile = this.updateFile.bind(this);
+        this.deleteFile = this.deleteFile.bind(this);
+    }
+
     async uploadFile(req: Request, res: Response, next: NextFunction) {
         try {
             if (!req.file) {
@@ -49,7 +58,8 @@ export class FileController {
                 category: validated.category
             });
 
-            await prisma.auditLog.create({
+            // Fire-and-forget: don't let a failed audit log break the upload
+            prisma.auditLog.create({
                 data: {
                     userId: req.user!.id,
                     action: 'UPLOAD',
@@ -60,7 +70,7 @@ export class FileController {
                         fileSize: file.fileSize
                     }
                 }
-            });
+            }).catch(err => logger.error('Audit log failed on upload:', err));
 
             logger.info(`File uploaded: ${file.fileName} (${file.id}) by ${req.user?.employeeId}`);
             res.status(201).json(successResponse(file, 'File uploaded successfully'));
@@ -168,7 +178,7 @@ export class FileController {
                 }
             });
 
-            const filePath = path.join(__dirname, '../../uploads', file.filePath);
+            const filePath = path.join(process.cwd(), 'uploads', file.filePath);
             
             if (!fs.existsSync(filePath)) {
                 throw new AppError('File not found on server', 404);
@@ -219,14 +229,15 @@ export class FileController {
                 throw new AppError('You do not have permission to delete this file', 403);
             }
 
-            const filePath = path.join(__dirname, '../../uploads', file.filePath);
+            const filePath = path.join(process.cwd(), 'uploads', file.filePath);
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
             }
 
             await this.fileService.deleteFile(id as string);
 
-            await prisma.auditLog.create({
+            // Fire-and-forget: don't let a failed audit log block the response
+            prisma.auditLog.create({
                 data: {
                     userId: req.user!.id,
                     action: 'DELETE',
@@ -237,7 +248,7 @@ export class FileController {
                         reason: 'File deleted'
                     }
                 }
-            });
+            }).catch(err => logger.error('Audit log failed on delete:', err));
 
             logger.warn(`File deleted: ${file.fileName} (${id}) by ${req.user?.employeeId}`);
             res.json(successResponse(null, 'File deleted successfully'));

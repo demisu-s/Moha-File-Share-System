@@ -9,6 +9,17 @@ import { logger } from '../utils/logger';
 export class PlantController {
     private plantService = new PlantService();
 
+    constructor() {
+        this.createPlant = this.createPlant.bind(this);
+        this.getAllPlants = this.getAllPlants.bind(this);
+        this.getPlantById = this.getPlantById.bind(this);
+        this.updatePlant = this.updatePlant.bind(this);
+        this.deletePlant = this.deletePlant.bind(this);
+        this.getPlantStats = this.getPlantStats.bind(this);
+        this.searchPlants = this.searchPlants.bind(this);
+        this.getAccessiblePlants = this.getAccessiblePlants.bind(this);
+    }
+
     async createPlant(req: Request, res: Response, next: NextFunction) {
         try {
             const validated = createPlantSchema.parse(req.body);
@@ -34,7 +45,7 @@ export class PlantController {
             let where = {};
             if (req.user?.role === 'PLANT_ADMIN') {
                 where = { id: req.user.plantId };
-            } else if (req.user?.role === 'DEPARTMENT_HEAD' || req.user?.role === 'EMPLOYEE') {
+} else if (req.user?.role === 'DEPARTMENT_HEAD' || req.user?.role === 'EMPLOYEE' || req.user?.role === 'VIEWER') {
                 // Department heads and employees can only see their own plant
                 where = { id: req.user.plantId };
             }

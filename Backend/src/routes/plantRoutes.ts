@@ -6,6 +6,7 @@ import { ROLES } from '../constants/roles';
 const router = Router();
 const plantController = new PlantController();
 
+// Create — SUPER_ADMIN only
 router.post(
     '/',
     authenticate,
@@ -13,19 +14,43 @@ router.post(
     plantController.createPlant
 );
 
+// List — all authenticated users (controller scopes results by role)
 router.get(
     '/',
     authenticate,
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLANT_ADMIN),
     plantController.getAllPlants
 );
 
+// Search — all authenticated users
+router.get(
+    '/search',
+    authenticate,
+    plantController.searchPlants
+);
+
+// Accessible plants for the requesting user
+router.get(
+    '/accessible',
+    authenticate,
+    plantController.getAccessiblePlants
+);
+
+// Get by ID — all authenticated users
 router.get(
     '/:id',
     authenticate,
     plantController.getPlantById
 );
 
+// Stats for a specific plant
+router.get(
+    '/:id/stats',
+    authenticate,
+    authorize(ROLES.SUPER_ADMIN, ROLES.PLANT_ADMIN),
+    plantController.getPlantStats
+);
+
+// Update — SUPER_ADMIN and PLANT_ADMIN
 router.put(
     '/:id',
     authenticate,
@@ -33,6 +58,7 @@ router.put(
     plantController.updatePlant
 );
 
+// Delete — SUPER_ADMIN only
 router.delete(
     '/:id',
     authenticate,

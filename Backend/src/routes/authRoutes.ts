@@ -6,7 +6,7 @@ import { loginSchema } from '../validators/authValidator';
 import { AppError } from '../middleware/errorHandler';
 import { successResponse } from '../utils/response';
 import { registerSchema, changePasswordSchema } from '../validators/authValidator';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
@@ -18,14 +18,17 @@ router.post('/login', async (req, res, next) => {
             where: { employeeId: validated.employeeId }
         });
 
-        // Check user exists and is active first — same error to prevent enumeration
-        if (!user || !user.isActive) {
+        if (!user) {
             throw new AppError('Invalid credentials', 401);
         }
 
         const isValidPassword = await bcrypt.compare(validated.password, user.password);
         if (!isValidPassword) {
             throw new AppError('Invalid credentials', 401);
+        }
+
+        if (!user.isActive) {
+            throw new AppError('User account is deactivated', 401);
         }
 
         const token = jwt.sign(
@@ -61,7 +64,7 @@ router.post('/login', async (req, res, next) => {
         next(error);
     }
 });
-router.post('/register', async (req, res, next) => {
+router.post('/register', authenticate, authorize('SUPER_ADMIN', 'PLANT_ADMIN', 'DEPARTMENT_HEAD'), async (req, res, next) => {
   try {
     const validated = registerSchema.parse(req.body);
 

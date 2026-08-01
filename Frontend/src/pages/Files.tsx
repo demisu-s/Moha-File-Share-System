@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { formatFileSize, categoryIcon } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface FileItem {
   id: string;
@@ -79,10 +80,7 @@ export default function Files() {
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <a href="/dashboard" className="text-sm text-muted-foreground hover:underline">
-            ← Back to dashboard
-          </a>
-          <h1 className="text-2xl font-semibold tracking-tight mt-2">Files</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Files</h1>
           <p className="text-sm text-muted-foreground">
             {isLoading ? "Loading…" : `${total} ${total === 1 ? "file" : "files"} in your scope`}
           </p>
@@ -98,7 +96,7 @@ export default function Files() {
           <Button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="bg-[#D98E3F] hover:bg-[#D98E3F]/90 text-white"
+            className="bg-[var(--brand)] hover:bg-[var(--brand)]/90 text-white"
           >
             {isUploading ? "Uploading…" : "Upload file"}
           </Button>
@@ -109,7 +107,19 @@ export default function Files() {
         <p className="text-sm text-destructive mb-4" role="alert">{error}</p>
       )}
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading files…</p>}
+      {isLoading && (
+        <div className="border rounded-lg divide-y">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-3 p-4">
+              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!isLoading && files.length === 0 && !error && (
         <div className="border rounded-lg p-12 text-center">
@@ -121,7 +131,10 @@ export default function Files() {
       {!isLoading && files.length > 0 && (
         <div className="border rounded-lg divide-y">
           {files.map((file) => (
-            <div key={file.id} className="flex items-center justify-between p-4">
+            <div
+              key={file.id}
+              className="flex items-center justify-between p-4 transition-colors hover:bg-[var(--color-background)]"
+            >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-xl shrink-0">{categoryIcon(file.category)}</span>
                 <div className="min-w-0">

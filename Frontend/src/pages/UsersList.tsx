@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface User {
   id: string;
@@ -14,7 +15,7 @@ interface User {
 }
 
 const ROLE_STYLES: Record<string, string> = {
-  SUPER_ADMIN: "bg-[#D98E3F]/15 text-[#D98E3F]",
+  SUPER_ADMIN: "bg-[var(--brand)]/15 text-[var(--brand)]",
   PLANT_ADMIN: "bg-blue-500/10 text-blue-600",
   DEPARTMENT_HEAD: "bg-purple-500/10 text-purple-600",
   EMPLOYEE: "bg-muted text-muted-foreground",
@@ -46,19 +47,26 @@ export default function UsersList() {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-6">
-        
-        <h1 className="text-2xl font-semibold tracking-tight mt-2">Users</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Users</h1>
         <p className="text-sm text-muted-foreground">
           {isLoading ? "Loading…" : `${total} ${total === 1 ? "person" : "people"} in your scope`}
         </p>
       </div>
 
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">Loading users…</p>
-      )}
-
       {error && (
         <p className="text-sm text-destructive" role="alert">{error}</p>
+      )}
+
+      {isLoading && (
+        <div className="border rounded-lg divide-y">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-4 p-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </div>
+          ))}
+        </div>
       )}
 
       {!isLoading && !error && users.length === 0 && (
@@ -80,7 +88,7 @@ export default function UsersList() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-t">
+                <tr key={u.id} className="border-t transition-colors hover:bg-[var(--color-background)]">
                   <td className="px-4 py-2">
                     {u.fullName}
                     {u.id === currentUser?.id && (

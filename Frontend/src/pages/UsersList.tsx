@@ -76,8 +76,8 @@ export default function UsersList() {
       )}
 
       {!isLoading && users.length > 0 && (
-        <div className="border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="border rounded-lg overflow-x-auto">
+  <table className="w-full text-sm min-w-[500px]">
             <thead className="bg-muted/50 text-left">
               <tr>
                 <th className="px-4 py-2 font-medium">Name</th>

@@ -10,6 +10,7 @@ import Files from "@/pages/Files";
 import Plants from "@/pages/Plants";
 import Departments from "@/pages/Departments";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import Shares from "@/pages/Shares";
 
 interface Stats {
   totalUsers: number;
@@ -170,7 +171,10 @@ function App() {
             />
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/shares" element={<ProtectedRoute><Shares /></ProtectedRoute>} />
           </Routes>
+
+
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

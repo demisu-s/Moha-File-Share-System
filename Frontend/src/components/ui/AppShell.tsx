@@ -6,6 +6,7 @@ import { LayoutDashboard, FolderOpen, Users, Building2, Network } from "lucide-r
 import logo from "@/assets/logo.png";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Sun, Moon } from "lucide-react";
+import { Share2 } from "lucide-react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", roles: null, icon: LayoutDashboard },
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
   { path: "/users", label: "Users", roles: ["SUPER_ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD"], icon: Users },
   { path: "/plants", label: "Plants", roles: ["SUPER_ADMIN"], icon: Building2 },
   { path: "/departments", label: "Departments", roles: ["SUPER_ADMIN", "PLANT_ADMIN"], icon: Network },
+  { path: "/shares", label: "Shares", roles: null, icon: Share2 },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/ui/AppShell";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
+import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import UsersList from "@/pages/UsersList";
 import Files from "@/pages/Files";
@@ -11,6 +12,7 @@ import Plants from "@/pages/Plants";
 import Departments from "@/pages/Departments";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Shares from "@/pages/Shares";
+
 
 interface Stats {
   totalUsers: number;
@@ -115,6 +117,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
 
             <Route
@@ -170,7 +173,7 @@ function App() {
               }
             />
 
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
             <Route path="/shares" element={<ProtectedRoute><Shares /></ProtectedRoute>} />
           </Routes>
 

@@ -24,7 +24,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-5 bg-background">
-      {/* Brand panel — bold, full-bleed, confident */}
       <div className="hidden lg:flex lg:col-span-2 flex-col justify-between bg-brand text-white p-12 relative overflow-hidden">
         <div className="absolute -right-24 -top-24 w-96 h-96 rounded-full bg-white/5" />
         <div className="absolute -left-16 bottom-0 w-72 h-72 rounded-full bg-white/5" />
@@ -63,7 +62,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Form panel */}
       <div className="lg:col-span-3 flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-8">
           <div className="lg:hidden flex justify-center mb-4">

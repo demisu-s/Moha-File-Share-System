@@ -112,11 +112,28 @@ export class FileController {
                 where.departmentId = req.user.departmentId;
             }
 
+const shareFilter = {
+                shares: {
+                    some: {
+                        isActive: true,
+                        OR: [
+                            { sharedWithUserId: req.user?.id },
+                            { sharedWithDeptId: req.user?.departmentId },
+                            { sharedWithPlantId: req.user?.plantId },
+                            { sharedWithAll: true },
+                        ],
+                    },
+                },
+            };
+
             if (req.user?.role === 'EMPLOYEE' || req.user?.role === 'VIEWER') {
                 where.OR = [
                     { departmentId: req.user.departmentId },
-                    { uploadedById: req.user.id }
+                    { uploadedById: req.user.id },
+                    shareFilter,
                 ];
+            } else if (req.user?.role === 'PLANT_ADMIN' || req.user?.role === 'DEPARTMENT_HEAD') {
+                where.OR = [shareFilter];
             }
 
             if (req.query.search) {

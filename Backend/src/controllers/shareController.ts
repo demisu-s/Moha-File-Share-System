@@ -50,33 +50,27 @@ export class ShareController {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
             
-            let where: any = { isActive: true };
-            
+ let where: any = { isActive: true };
+
             if (!req.user) {
                 throw new AppError('User not authenticated', 401);
             }
 
             if (req.user.role === 'SUPER_ADMIN') {
-                // Super admin sees all shares
-            } else if (req.user.role === 'PLANT_ADMIN') {
-                where.OR = [
-                    { sharedBy: req.user.id },
-                    { sharedWithPlantId: req.user.plantId }
-                ];
-            } else if (req.user.role === 'DEPARTMENT_HEAD') {
-                where.OR = [
-                    { sharedBy: req.user.id },
-                    { sharedWithDeptId: req.user.departmentId },
-                    { sharedWithUserId: req.user.id }
-                ];
+                // sees everything
             } else {
-                where.OR = [
+                const conditions: any[] = [
                     { sharedBy: req.user.id },
                     { sharedWithUserId: req.user.id },
-                    { sharedWithDeptId: req.user.departmentId },
-                    { sharedWithPlantId: req.user.plantId },
-                    { sharedWithAll: true }
+                    { sharedWithAll: true },
                 ];
+                if (req.user.departmentId) {
+                    conditions.push({ sharedWithDeptId: req.user.departmentId });
+                }
+                if (req.user.plantId) {
+                    conditions.push({ sharedWithPlantId: req.user.plantId });
+                }
+                where.OR = conditions;
             }
 
             const result = await this.shareService.getShares(where, page, limit);

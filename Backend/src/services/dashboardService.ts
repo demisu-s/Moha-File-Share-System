@@ -14,16 +14,18 @@ export class DashboardService {
         ? plantFilter
         : { departmentId: user.departmentId ?? undefined };
 
-    const [totalUsers, totalFiles, totalPlants, totalDepartments, recentFiles] =
+    const fileWhere = { isDeleted: false, ...deptFilter };
+
+    const [totalUsers, totalFiles, totalPlants, totalDepartments, recentFiles, storageAgg, categoryBreakdown] =
       await Promise.all([
         prisma.user.count({ where: isSuperAdmin ? {} : plantFilter }),
-        prisma.file.count({ where: { isDeleted: false, ...deptFilter } }),
+        prisma.file.count({ where: fileWhere }),
         isSuperAdmin ? prisma.plant.count() : Promise.resolve(null),
         isSuperAdmin || isPlantAdmin
           ? prisma.department.count({ where: plantFilter })
           : Promise.resolve(null),
         prisma.file.findMany({
-          where: { isDeleted: false, ...deptFilter },
+          where: fileWhere,
           orderBy: { createdAt: 'desc' },
           take: 5,
           select: {
@@ -34,6 +36,15 @@ export class DashboardService {
             uploadedBy: { select: { fullName: true } },
           },
         }),
+        prisma.file.aggregate({
+          where: fileWhere,
+          _sum: { fileSize: true },
+        }),
+        prisma.file.groupBy({
+          by: ['category'],
+          where: fileWhere,
+          _count: { category: true },
+        }),
       ]);
 
     return {
@@ -42,6 +53,11 @@ export class DashboardService {
       totalPlants,
       totalDepartments,
       recentFiles,
+      totalStorageBytes: storageAgg._sum.fileSize ?? 0,
+      categoryBreakdown: categoryBreakdown.map((c) => ({
+        category: c.category,
+        count: c._count.category,
+      })),
     };
   }
 

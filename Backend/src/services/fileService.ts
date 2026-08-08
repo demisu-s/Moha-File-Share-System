@@ -22,6 +22,7 @@ export class FileService {
                 fileHash: fileHash,
                 plantId: data.plantId || null,
                 departmentId: data.departmentId || null,
+                uploadedById: data.uploadedBy,
                 isDeleted: false
             }
         });

@@ -31,7 +31,7 @@ router.get(
     authenticate,
     fileController.downloadFile
 );
-
+router.get('/:id/preview', authenticate, fileController.previewFile);
 router.put(
     '/:id',
     authenticate,

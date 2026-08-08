@@ -4,7 +4,7 @@ import { formatFileSize, categoryIcon } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import ShareDialog from "@/components/ui/ShareDialog";
-import { LayoutGrid, List, Search, UploadCloud } from "lucide-react";
+import { LayoutGrid, List, Search, UploadCloud, X } from "lucide-react";
 
 interface FileItem {
   id: string;
@@ -12,12 +12,23 @@ interface FileItem {
   originalName: string;
   fileSize: number;
   category: string;
+  mimeType?: string;
   description: string | null;
   createdAt: string;
   uploadedBy: { fullName: string; employeeId: string };
 }
 
 const CATEGORIES = ["DOCUMENT", "SPREADSHEET", "PRESENTATION", "PDF", "IMAGE", "VIDEO", "OTHER"];
+const PREVIEWABLE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "application/pdf"];
+
+function detectCategory(file: File): string {
+  if (file.type.startsWith("image/")) return "IMAGE";
+  if (file.type === "application/pdf") return "PDF";
+  if (file.type.includes("word")) return "DOCUMENT";
+  if (file.type.includes("sheet") || file.type.includes("excel")) return "SPREADSHEET";
+  if (file.type.includes("presentation") || file.type.includes("powerpoint")) return "PRESENTATION";
+  return "OTHER";
+}
 
 export default function Files() {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -26,6 +37,9 @@ export default function Files() {
   const [error, setError] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [sharingFile, setSharingFile] = useState<FileItem | null>(null);
+  const [previewingFile, setPreviewingFile] = useState<FileItem | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -62,7 +76,7 @@ export default function Files() {
     setError("");
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("category", "OTHER");
+    formData.append("category", detectCategory(file));
 
     try {
       await api.post("/files/upload", formData, {
@@ -118,6 +132,33 @@ export default function Files() {
     window.URL.revokeObjectURL(url);
   }
 
+  async function handlePreview(file: FileItem) {
+    setPreviewingFile(file);
+    setPreviewLoading(true);
+    try {
+      const response = await api.get(`/files/${file.id}/preview`, {
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(response.data);
+      setPreviewUrl(url);
+    } catch {
+      setError("Couldn't load preview.");
+      setPreviewingFile(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl) window.URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPreviewingFile(null);
+  }
+
+  function isPreviewable(file: FileItem) {
+    return file.category === "IMAGE" || file.category === "PDF";
+  }
+
   return (
     <div
       className="p-4 sm:p-8 max-w-5xl mx-auto relative"
@@ -126,7 +167,6 @@ export default function Files() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Drag overlay — appears anywhere over the page while dragging a file */}
       {isDragging && (
         <div className="fixed inset-0 z-40 bg-brand/10 backdrop-blur-sm flex items-center justify-center pointer-events-none">
           <div className="bg-card border-2 border-dashed border-brand rounded-2xl px-12 py-10 flex flex-col items-center gap-3">
@@ -161,7 +201,6 @@ export default function Files() {
         </div>
       </div>
 
-      {/* Search, filter, view toggle */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -240,13 +279,15 @@ export default function Files() {
         </div>
       )}
 
-      {/* Grid view */}
       {!isLoading && view === "grid" && visibleFiles.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {visibleFiles.map((file) => (
             <div
               key={file.id}
-              className="group border border-border rounded-xl p-4 bg-card transition-all hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-light/50"
+              onClick={() => isPreviewable(file) && handlePreview(file)}
+              className={`group border border-border rounded-xl p-4 bg-card transition-all hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-light/50 ${
+                isPreviewable(file) ? "cursor-pointer" : ""
+              }`}
             >
               <div className="h-16 rounded-lg bg-brand/5 flex items-center justify-center text-3xl mb-3 transition-transform group-hover:scale-105">
                 {categoryIcon(file.category)}
@@ -255,7 +296,10 @@ export default function Files() {
                 {file.originalName}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">{formatFileSize(file.fileSize)}</p>
-              <div className="flex gap-1.5 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                className="flex gap-1.5 mt-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Button
                   onClick={() => setSharingFile(file)}
                   className="flex-1 h-7 text-xs bg-transparent hover:bg-muted text-foreground border border-border"
@@ -274,7 +318,6 @@ export default function Files() {
         </div>
       )}
 
-      {/* List view */}
       {!isLoading && view === "list" && visibleFiles.length > 0 && (
         <div className="border rounded-lg divide-y">
           {visibleFiles.map((file) => (
@@ -282,7 +325,10 @@ export default function Files() {
               key={file.id}
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 transition-colors hover:bg-muted/30"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`flex items-center gap-3 min-w-0 ${isPreviewable(file) ? "cursor-pointer" : ""}`}
+                onClick={() => isPreviewable(file) && handlePreview(file)}
+              >
                 <span className="text-xl shrink-0">{categoryIcon(file.category)}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{file.originalName}</p>
@@ -317,6 +363,28 @@ export default function Files() {
           onClose={() => setSharingFile(null)}
           onShared={loadFiles}
         />
+      )}
+
+      {previewingFile && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+              <p className="text-sm font-medium truncate">{previewingFile.originalName}</p>
+              <button onClick={closePreview} className="text-muted-foreground hover:text-foreground">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-muted/20 p-4">
+              {previewLoading ? (
+                <Skeleton className="h-96 w-full" />
+              ) : previewUrl && previewingFile.category === "IMAGE" ? (
+                <img src={previewUrl} alt={previewingFile.originalName} className="max-w-full max-h-full object-contain" />
+              ) : previewUrl && previewingFile.category === "PDF" ? (
+                <iframe src={previewUrl} title={previewingFile.originalName} className="w-full h-[70vh]" />
+              ) : null}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

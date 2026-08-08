@@ -17,6 +17,7 @@ export class FileController {
         this.getAllFiles = this.getAllFiles.bind(this);
         this.getFileById = this.getFileById.bind(this);
         this.downloadFile = this.downloadFile.bind(this);
+        this.previewFile = this.previewFile.bind(this);
         this.updateFile = this.updateFile.bind(this);
         this.deleteFile = this.deleteFile.bind(this);
     }
@@ -52,12 +53,11 @@ export class FileController {
             const file = await this.fileService.uploadFile({
                 file: req.file,
                 uploadedBy: req.user!.id,
-                plantId: validated.plantId,
-                departmentId: validated.departmentId,
+                plantId: validated.plantId ?? req.user!.plantId ?? undefined,
+                departmentId: validated.departmentId ?? req.user!.departmentId ?? undefined,
                 description: validated.description,
                 category: validated.category
             });
-
             // Fire-and-forget: don't let a failed audit log break the upload
             prisma.auditLog.create({
                 data: {
@@ -112,16 +112,22 @@ export class FileController {
                 where.departmentId = req.user.departmentId;
             }
 
-const shareFilter = {
+const shareConditions: any[] = [
+                { sharedWithUserId: req.user?.id },
+                { sharedWithAll: true },
+            ];
+            if (req.user?.departmentId) {
+                shareConditions.push({ sharedWithDeptId: req.user.departmentId });
+            }
+            if (req.user?.plantId) {
+                shareConditions.push({ sharedWithPlantId: req.user.plantId });
+            }
+
+            const shareFilter = {
                 shares: {
                     some: {
                         isActive: true,
-                        OR: [
-                            { sharedWithUserId: req.user?.id },
-                            { sharedWithDeptId: req.user?.departmentId },
-                            { sharedWithPlantId: req.user?.plantId },
-                            { sharedWithAll: true },
-                        ],
+                        OR: shareConditions,
                     },
                 },
             };
@@ -203,6 +209,50 @@ const shareFilter = {
 
             logger.info(`File downloaded: ${file.fileName} (${file.id}) by ${req.user?.employeeId}`);
             res.download(filePath, file.originalName);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async previewFile(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+
+            const file = await this.fileService.getFileById(id as string);
+
+            if (!file) {
+                throw new AppError('File not found', 404);
+            }
+
+            const hasAccess = await this.fileService.canAccessFile(req.user!.id, file.id);
+            if (!hasAccess) {
+                throw new AppError('You do not have permission to view this file', 403);
+            }
+
+            const previewableTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+            if (!previewableTypes.includes(file.mimeType)) {
+                throw new AppError('This file type cannot be previewed', 400);
+            }
+
+            await prisma.fileAccessLog.create({
+                data: {
+                    fileId: file.id,
+                    userId: req.user!.id,
+                    action: 'VIEW',
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent']
+                }
+            });
+
+            const filePath = path.join(process.cwd(), 'uploads', file.filePath);
+
+            if (!fs.existsSync(filePath)) {
+                throw new AppError('File not found on server', 404);
+            }
+
+            res.setHeader('Content-Disposition', `inline; filename="${file.originalName}"`);
+            res.setHeader('Content-Type', file.mimeType);
+            res.sendFile(filePath);
         } catch (error) {
             next(error);
         }

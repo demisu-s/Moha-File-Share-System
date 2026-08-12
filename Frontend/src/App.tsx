@@ -16,6 +16,7 @@ import Files from "@/pages/Files";
 import Plants from "@/pages/Plants";
 import Departments from "@/pages/Departments";
 import Shares from "@/pages/Shares";
+import Reports from "@/pages/Reports";
 
 interface Stats {
   totalUsers: number;
@@ -271,6 +272,14 @@ function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/files" element={<ProtectedRoute><Files /></ProtectedRoute>} />
             <Route path="/shares" element={<ProtectedRoute><Shares /></ProtectedRoute>} />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "PLANT_ADMIN"]}>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/users"
               element={

@@ -109,7 +109,28 @@ async function seed() {
                 createdBy: superAdmin.id
             }
         });
-        console.log(`✅ Department created: ${dept4.name} (${dept4.code})`);
+        // ============================================
+        // 3.5 CREATE SECTIONS
+        // ============================================
+        console.log('\n📐 Creating Sections...');
+        
+        const sec1 = await prisma.section.create({
+            data: {
+                name: 'Recruitment',
+                departmentId: dept1.id,
+                description: 'HR Recruitment Section',
+            }
+        });
+        console.log(`✅ Section created: ${sec1.name}`);
+
+        const sec2 = await prisma.section.create({
+            data: {
+                name: 'Payroll',
+                departmentId: dept2.id,
+                description: 'Finance Payroll Section',
+            }
+        });
+        console.log(`✅ Section created: ${sec2.name}`);
 
         // ============================================
         // 4. CREATE USERS
@@ -201,6 +222,7 @@ async function seed() {
                 employeeId: 'EMP001',
                 plantId: plant1.id,
                 departmentId: dept1.id,
+                sectionId: sec1.id,
                 role: 'EMPLOYEE',
                 createdBy: deptHead1.id,
                 isActive: true
@@ -270,6 +292,33 @@ async function seed() {
         console.log(`✅ Viewer created: ${viewer.fullName} (${viewer.employeeId})`);
 
         // ============================================
+        // 4.5 CREATE FOLDERS
+        // ============================================
+        console.log('\n📁 Creating Folders...');
+
+        const folder1 = await prisma.folder.create({
+            data: {
+                name: 'Public Policies',
+                plantId: plant1.id,
+                departmentId: dept1.id,
+                sectionId: sec1.id,
+                createdById: deptHead1.id
+            }
+        });
+        console.log(`✅ Folder created: ${folder1.name}`);
+
+        const folder2 = await prisma.folder.create({
+            data: {
+                name: 'Q1 Reports',
+                plantId: plant1.id,
+                departmentId: dept2.id,
+                sectionId: sec2.id,
+                createdById: deptHead2.id
+            }
+        });
+        console.log(`✅ Folder created: ${folder2.name}`);
+
+        // ============================================
         // 5. CREATE SAMPLE FILES
         // ============================================
         console.log('\n📄 Creating sample files...');
@@ -289,6 +338,8 @@ async function seed() {
                 category: 'DOCUMENT',
                 plantId: plant1.id,
                 departmentId: dept1.id,
+                sectionId: sec1.id,
+                folderId: folder1.id,
                 uploadedById: deptHead1.id
             }
         });
@@ -306,6 +357,8 @@ async function seed() {
                 category: 'SPREADSHEET',
                 plantId: plant1.id,
                 departmentId: dept2.id,
+                sectionId: sec2.id,
+                folderId: folder2.id,
                 uploadedById: deptHead2.id
             }
         });
@@ -363,7 +416,7 @@ async function seed() {
                 fileId: file3.id,
                 sharedBy: deptHead3.id,
                 sharedWithUserId: employee4.id,
-                permission: 'EDIT',
+                permission: 'MODIFY',
                 isActive: true
             }
         });

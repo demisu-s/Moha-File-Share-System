@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", roles: null, icon: LayoutDashboard },
   { path: "/files", label: "Files", roles: null, icon: FolderOpen },
   { path: "/shares", label: "Shares", roles: null, icon: Share2 },
+  { path: "/reports", label: "Reports", roles: ["SUPER_ADMIN", "PLANT_ADMIN"], icon: LayoutDashboard },
   { path: "/users", label: "Users", roles: ["SUPER_ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD"], icon: Users },
   { path: "/plants", label: "Plants", roles: ["SUPER_ADMIN"], icon: Building2 },
   { path: "/departments", label: "Departments", roles: ["SUPER_ADMIN", "PLANT_ADMIN"], icon: Network },
@@ -40,9 +41,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const sidebarContent = (
     <>
-      <div className="h-16 flex items-center justify-between px-5 border-b border-border shrink-0">
-        <img src={logo} alt="MOHA" className="h-8" />
-        <button onClick={() => setMobileOpen(false)} className="lg:hidden text-muted-foreground">
+      <div className="h-16 flex items-center px-5 border-b border-border shrink-0">
+        <img src={logo} alt="MOHA" className="h-8 shrink-0 mr-3" />
+        <span className="font-bold text-sm leading-tight text-foreground line-clamp-2">MOHA SOFT DRINKS INDUSTRY S.C.</span>
+        <button onClick={() => setMobileOpen(false)} className="lg:hidden ml-auto text-muted-foreground">
           <X className="size-5" />
         </button>
       </div>
@@ -55,10 +57,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
               key={item.path}
               to={item.path}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-200 border-l-2 ${
                 isActive
-                  ? "bg-brand text-white"
-                  : "text-muted-foreground hover:bg-brand/10 hover:text-foreground"
+                  ? "bg-brand/10 text-brand border-brand font-semibold shadow-[inset_1px_0_0_0_transparent]"
+                  : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground font-medium"
               }`}
             >
               <Icon className="size-4 shrink-0" />

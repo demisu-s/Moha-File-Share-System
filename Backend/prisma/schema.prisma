@@ -1,7 +1,8 @@
 // prisma/schema.prisma
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "windows"]
 }
 
 datasource db {
@@ -12,22 +13,23 @@ datasource db {
 // ============ CORE MODELS ============
 
 model Plant {
-  id            String    @id @default(cuid())
-  name          String    @unique
-  code          String    @unique
+  id            String       @id @default(cuid())
+  name          String       @unique
+  code          String       @unique
   location      String
   address       String?
   phone         String?
   email         String?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   
   // Relations
   departments   Department[]
   users         User[]
   files         File[]
-  fileShares    FileShare[] @relation("PlantShares")
+  folders       Folder[]
+  fileShares    FileShare[]  @relation("PlantShares")
   
   // Metadata
   createdBy     String?
@@ -35,51 +37,98 @@ model Plant {
 }
 
 model Department {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   name          String
-  code          String    @unique
+  code          String       @unique
   description   String?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   
   // Relations
   plantId       String
-  plant         Plant     @relation(fields: [plantId], references: [id])
+  plant         Plant        @relation(fields: [plantId], references: [id])
+  sections      Section[]
   users         User[]
   files         File[]
-  fileShares    FileShare[] @relation("DeptShares")
+  folders       Folder[]
+  fileShares    FileShare[]  @relation("DeptShares")
   
   // Metadata
   createdBy     String?
   settings      Json?
 }
 
+model Section {
+  id            String       @id @default(cuid())
+  name          String
+  description   String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  departmentId  String
+  department    Department   @relation(fields: [departmentId], references: [id])
+  users         User[]
+  folders       Folder[]
+  files         File[]
+}
+
+model Folder {
+  id            String       @id @default(cuid())
+  name          String
+  description   String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Hierarchy
+  parentFolderId String?
+  parentFolder   Folder?     @relation("SubFolders", fields: [parentFolderId], references: [id])
+  subFolders     Folder[]    @relation("SubFolders")
+  
+  // Relations
+  plantId       String?
+  plant         Plant?       @relation(fields: [plantId], references: [id])
+  departmentId  String?
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  sectionId     String?
+  section       Section?     @relation(fields: [sectionId], references: [id])
+  
+  files         File[]
+  createdById   String
+  createdBy     User         @relation("CreatedFolders", fields: [createdById], references: [id])
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String       @id @default(cuid())
+  email         String       @unique
   password      String
   fullName      String
-  employeeId    String    @unique
+  employeeId    String       @unique
   phone         String?
   profileImage  String?
-  isActive      Boolean   @default(true)
+  isActive      Boolean      @default(true)
   lastLogin     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   
   // Relations - Hierarchical
   plantId       String?
-  plant         Plant?    @relation(fields: [plantId], references: [id])
+  plant         Plant?       @relation(fields: [plantId], references: [id])
   departmentId  String?
-  department    Department? @relation(fields: [departmentId], references: [id])
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  sectionId     String?
+  section       Section?     @relation(fields: [sectionId], references: [id])
   
   // Role & Permissions
-  role          Role      @default(EMPLOYEE)
+  role          Role         @default(EMPLOYEE)
   permissions   Permission[]
   
   // File Relations
-  uploadedFiles File[]    @relation("UploadedFiles")
+  uploadedFiles File[]       @relation("UploadedFiles")
+  createdFolders Folder[]    @relation("CreatedFolders")
+  fileVersions  FileVersion[]
   sharedFiles   FileShare[]
   notifications Notification[]
   auditLogs     AuditLog[]
@@ -90,7 +139,7 @@ model User {
 }
 
 model File {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   fileName      String
   originalName  String
   fileSize      Int
@@ -98,93 +147,109 @@ model File {
   mimeType      String
   filePath      String
   fileHash      String?
-  version       Int       @default(1)
-  isActive      Boolean   @default(true)
-  isDeleted     Boolean   @default(false)
+  version       Int          @default(1)
+  isActive      Boolean      @default(true)
+  isDeleted     Boolean      @default(false)
   deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   
   // Relations - Hierarchical
   plantId       String?
-  plant         Plant?    @relation(fields: [plantId], references: [id])
+  plant         Plant?       @relation(fields: [plantId], references: [id])
   departmentId  String?
-  department    Department? @relation(fields: [departmentId], references: [id])
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  sectionId     String?
+  section       Section?     @relation(fields: [sectionId], references: [id])
+  folderId      String?
+  folder        Folder?      @relation(fields: [folderId], references: [id])
   
   uploadedById  String
-  uploadedBy    User      @relation("UploadedFiles", fields: [uploadedById], references: [id])
+  uploadedBy    User         @relation("UploadedFiles", fields: [uploadedById], references: [id])
   
+  versions      FileVersion[]
   shares        FileShare[]
   accessLogs    FileAccessLog[]
   
-  // Metadata - REMOVED String[] because MySQL doesn't support arrays
-  // tags          String[]  // REMOVED - MySQL doesn't support arrays
   description   String?
   category      FileCategory @default(OTHER)
 }
 
+model FileVersion {
+  id            String       @id @default(cuid())
+  fileId        String
+  file          File         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  filePath      String
+  fileSize      Int
+  originalName  String
+  uploadedById  String
+  uploadedBy    User         @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime     @default(now())
+}
+
 model FileShare {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   
   fileId        String
-  file          File      @relation(fields: [fileId], references: [id])
+  file          File         @relation(fields: [fileId], references: [id])
   
   sharedBy      String
-  sharedAt      DateTime  @default(now())
+  sharedAt      DateTime     @default(now())
   
   // Who gets access
   sharedWithUserId  String?
-  sharedWithUser    User?     @relation(fields: [sharedWithUserId], references: [id])
+  sharedWithUser    User?      @relation(fields: [sharedWithUserId], references: [id])
   sharedWithPlantId String?
-  sharedWithPlant   Plant?    @relation("PlantShares", fields: [sharedWithPlantId], references: [id])
+  sharedWithPlant   Plant?     @relation("PlantShares", fields: [sharedWithPlantId], references: [id])
   sharedWithDeptId  String?
   sharedWithDept    Department? @relation("DeptShares", fields: [sharedWithDeptId], references: [id])
-  sharedWithAll     Boolean   @default(false)
+  sharedWithAll     Boolean    @default(false)
   
   permission    PermissionLevel @default(VIEW)
   expiresAt     DateTime?
-  isActive      Boolean   @default(true)
+  isActive      Boolean      @default(true)
   
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model FileAccessLog {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   fileId        String
-  file          File      @relation(fields: [fileId], references: [id])
+  file          File         @relation(fields: [fileId], references: [id])
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
   action        AccessAction
   ipAddress     String?
   userAgent     String?
-  accessedAt    DateTime  @default(now())
+  accessedAt    DateTime     @default(now())
 }
 
 model Notification {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
   title         String
   message       String
   type          NotificationType
-  isRead        Boolean   @default(false)
+  isRead        Boolean      @default(false)
   readAt        DateTime?
   link          String?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime     @default(now())
 }
 
 model AuditLog {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
   action        String
   resourceType  ResourceType
   resourceId    String?
   details       Json
   ipAddress     String?
   userAgent     String?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime     @default(now())
 }
 
 // ============ ENUMS ============
@@ -199,10 +264,11 @@ enum Role {
 
 enum PermissionLevel {
   VIEW
-  EDIT
+  DOWNLOAD
+  MODIFY
+  MODIFY_ONLINE
   DELETE
-  SHARE
-  FULL_CONTROL
+  UPLOAD
 }
 
 enum FileCategory {
@@ -237,6 +303,8 @@ enum AccessAction {
 enum ResourceType {
   PLANT
   DEPARTMENT
+  SECTION
+  FOLDER
   USER
   FILE
   SHARE
@@ -246,14 +314,14 @@ enum ResourceType {
 // ============ PERMISSION SYSTEM ============
 
 model Permission {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
   resourceType  ResourceType
   resourceId    String?
   action        String
-  allowed       Boolean   @default(true)
-  createdAt     DateTime  @default(now())
+  allowed       Boolean      @default(true)
+  createdAt     DateTime     @default(now())
   
   @@unique([userId, resourceType, resourceId, action])
 }

@@ -17,6 +17,7 @@ export class FileController {
         this.getAllFiles = this.getAllFiles.bind(this);
         this.getFileById = this.getFileById.bind(this);
         this.downloadFile = this.downloadFile.bind(this);
+        this.previewFile = this.previewFile.bind(this);
         this.updateFile = this.updateFile.bind(this);
         this.deleteFile = this.deleteFile.bind(this);
     }
@@ -86,22 +87,22 @@ export class FileController {
             const plantId = req.query.plantId as string;
             const departmentId = req.query.departmentId as string;
             const category = req.query.category as string;
+            const folderId = req.query.folderId as string;
             
             let where: any = { 
                 isDeleted: false,
                 isActive: true 
             };
             
-            if (plantId) {
-                where.plantId = plantId;
-            }
+            if (plantId) where.plantId = plantId;
+            if (departmentId) where.departmentId = departmentId;
+            if (category) where.category = category;
             
-            if (departmentId) {
-                where.departmentId = departmentId;
-            }
-            
-            if (category) {
-                where.category = category;
+            // Allow looking for root files when folderId is explicitly null
+            if (folderId === 'null') {
+                where.folderId = null;
+            } else if (folderId) {
+                where.folderId = folderId;
             }
             
             if (req.user?.role === 'PLANT_ADMIN') {
@@ -112,28 +113,32 @@ export class FileController {
                 where.departmentId = req.user.departmentId;
             }
 
-const shareFilter = {
+            const shareConditions: any[] = [
+                { sharedWithUserId: req.user?.id },
+                { sharedWithAll: true },
+            ];
+            if (req.user?.departmentId) {
+                shareConditions.push({ sharedWithDeptId: req.user.departmentId });
+            }
+            if (req.user?.plantId) {
+                shareConditions.push({ sharedWithPlantId: req.user.plantId });
+            }
+
+            const shareFilter = {
                 shares: {
                     some: {
                         isActive: true,
-                        OR: [
-                            { sharedWithUserId: req.user?.id },
-                            { sharedWithDeptId: req.user?.departmentId },
-                            { sharedWithPlantId: req.user?.plantId },
-                            { sharedWithAll: true },
-                        ],
+                        OR: shareConditions,
                     },
                 },
             };
 
+            // Apply visibility rules based on role
             if (req.user?.role === 'EMPLOYEE' || req.user?.role === 'VIEWER') {
                 where.OR = [
-                    { departmentId: req.user.departmentId },
                     { uploadedById: req.user.id },
                     shareFilter,
                 ];
-            } else if (req.user?.role === 'PLANT_ADMIN' || req.user?.role === 'DEPARTMENT_HEAD') {
-                where.OR = [shareFilter];
             }
 
             if (req.query.search) {
@@ -180,9 +185,21 @@ const shareFilter = {
                 throw new AppError('File not found', 404);
             }
 
-            const hasAccess = await this.fileService.canAccessFile(req.user!.id, file.id);
+            const hasAccess = await this.fileService.canDownloadFile(req.user!.id, file.id);
             if (!hasAccess) {
                 throw new AppError('You do not have permission to download this file', 403);
+            }
+
+            // Prevent path traversal
+            const safeFilePath = path.basename(file.filePath);
+            const absoluteFilePath = path.resolve(process.cwd(), 'uploads', safeFilePath);
+            
+            if (!absoluteFilePath.startsWith(path.resolve(process.cwd(), 'uploads'))) {
+                throw new AppError('Invalid file path', 403);
+            }
+
+            if (!fs.existsSync(absoluteFilePath)) {
+                throw new AppError('File not found on server', 404);
             }
 
             await prisma.fileAccessLog.create({
@@ -195,14 +212,52 @@ const shareFilter = {
                 }
             });
 
-            const filePath = path.join(process.cwd(), 'uploads', file.filePath);
+            logger.info(`File downloaded: ${file.fileName} (${file.id}) by ${req.user?.employeeId}`);
+            res.download(absoluteFilePath, file.originalName);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async previewFile(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
             
-            if (!fs.existsSync(filePath)) {
+            const file = await this.fileService.getFileById(id as string);
+            
+            if (!file) {
+                throw new AppError('File not found', 404);
+            }
+
+            const hasAccess = await this.fileService.canDownloadFile(req.user!.id, file.id);
+            if (!hasAccess) {
+                throw new AppError('You do not have permission to view this file', 403);
+            }
+
+            // Prevent path traversal
+            const safeFilePath = path.basename(file.filePath);
+            const absoluteFilePath = path.resolve(process.cwd(), 'uploads', safeFilePath);
+            
+            if (!absoluteFilePath.startsWith(path.resolve(process.cwd(), 'uploads'))) {
+                throw new AppError('Invalid file path', 403);
+            }
+
+            if (!fs.existsSync(absoluteFilePath)) {
                 throw new AppError('File not found on server', 404);
             }
 
-            logger.info(`File downloaded: ${file.fileName} (${file.id}) by ${req.user?.employeeId}`);
-            res.download(filePath, file.originalName);
+            await prisma.fileAccessLog.create({
+                data: {
+                    fileId: file.id,
+                    userId: req.user!.id,
+                    action: 'VIEW',
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent']
+                }
+            });
+
+            logger.info(`File previewed: ${file.fileName} (${file.id}) by ${req.user?.employeeId}`);
+            res.sendFile(absoluteFilePath);
         } catch (error) {
             next(error);
         }

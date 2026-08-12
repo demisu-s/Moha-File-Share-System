@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/Input";
 import logo from "@/assets/logo.png";
 import loginBg from "@/assets/bg-login.jpg";
 
@@ -55,13 +56,13 @@ export default function Login() {
               <label htmlFor="employeeId" className="text-sm font-medium text-foreground">
                 Employee ID
               </label>
-              <input
+              <Input
                 id="employeeId"
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
                 placeholder="e.g. EMP001"
                 autoFocus
-                className="w-full h-11 px-3.5 rounded-lg border border-border bg-muted/30 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-light/40 focus-visible:border-brand-light"
+                className="bg-muted/30"
               />
             </div>
 
@@ -69,27 +70,27 @@ export default function Login() {
               <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </label>
-              <input
+              <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-lg border border-border bg-muted/30 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-light/40 focus-visible:border-brand-light"
+                className="bg-muted/30"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-sm font-medium text-destructive animate-in fade-in duration-200" role="alert">
                 {error}
               </p>
             )}
 
             <Button
               type="submit"
-              disabled={isLoading}
-              className="w-full h-11 bg-brand hover:bg-brand/90 text-white font-medium rounded-lg"
+              isLoading={isLoading}
+              className="w-full h-11 bg-brand hover:bg-brand/90 text-white font-medium rounded-lg text-base"
             >
-              {isLoading ? "Signing in…" : "Sign in"}
+              Sign in
             </Button>
           </form>
         </div>

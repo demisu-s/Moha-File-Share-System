@@ -88,7 +88,7 @@ export default function UsersList() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-t transition-colors hover:bg-[var(--color-background)]">
+                <tr key={u.id} className="border-t transition-colors duration-200 hover:bg-muted/40">
                   <td className="px-4 py-2">
                     {u.fullName}
                     {u.id === currentUser?.id && (

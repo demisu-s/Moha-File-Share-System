@@ -10,26 +10,54 @@ export class FileService {
         uploadedBy: string;
         plantId?: string;
         departmentId?: string;
+        sectionId?: string;
+        folderId?: string;
         description?: string;
         category?: string;
     }) {
-        // Generate file hash for deduplication
         const fileHash = await this.calculateFileHash(data.file.path);
         
-        // Check for duplicate file in same location
+        // Check if file with same original name exists in the same location
         const existingFile = await prisma.file.findFirst({
             where: {
-                fileHash: fileHash,
-                plantId: data.plantId || null,
+                originalName: data.file.originalname,
+                folderId: data.folderId || null,
+                sectionId: data.sectionId || null,
                 departmentId: data.departmentId || null,
+                plantId: data.plantId || null,
                 isDeleted: false
             }
         });
 
         if (existingFile) {
-            // Delete the uploaded file since it's a duplicate
-            fs.unlinkSync(data.file.path);
-            throw new AppError('File already exists in this location', 409);
+            // Version bump
+            await prisma.fileVersion.create({
+                data: {
+                    fileId: existingFile.id,
+                    versionNumber: existingFile.version,
+                    filePath: existingFile.filePath,
+                    fileSize: existingFile.fileSize,
+                    originalName: existingFile.originalName,
+                    uploadedById: existingFile.uploadedById
+                }
+            });
+            
+            return prisma.file.update({
+                where: { id: existingFile.id },
+                data: {
+                    fileName: data.file.filename,
+                    fileSize: data.file.size,
+                    fileType: path.extname(data.file.originalname).slice(1),
+                    mimeType: data.file.mimetype,
+                    filePath: data.file.filename,
+                    fileHash: fileHash,
+                    version: existingFile.version + 1,
+                    uploadedById: data.uploadedBy,
+                    description: data.description || existingFile.description,
+                    category: data.category as any || existingFile.category,
+                    updatedAt: new Date()
+                }
+            });
         }
 
         const file = await prisma.file.create({
@@ -43,6 +71,8 @@ export class FileService {
                 fileHash: fileHash,
                 plantId: data.plantId,
                 departmentId: data.departmentId,
+                sectionId: data.sectionId,
+                folderId: data.folderId,
                 uploadedById: data.uploadedBy,
                 description: data.description,
                 category: data.category as any || 'OTHER'
@@ -62,33 +92,15 @@ export class FileService {
                 take: limit,
                 include: {
                     uploadedBy: {
-                        select: {
-                            id: true,
-                            fullName: true,
-                            employeeId: true
-                        }
+                        select: { id: true, fullName: true, employeeId: true }
                     },
-                    plant: {
-                        select: {
-                            id: true,
-                            name: true,
-                            code: true
-                        }
-                    },
-                    department: {
-                        select: {
-                            id: true,
-                            name: true,
-                            code: true
-                        }
-                    },
+                    plant: { select: { id: true, name: true } },
+                    department: { select: { id: true, name: true } },
+                    section: { select: { id: true, name: true } },
+                    folder: { select: { id: true, name: true } },
                     shares: {
                         where: { isActive: true },
-                        select: {
-                            id: true,
-                            permission: true,
-                            sharedWithAll: true
-                        }
+                        select: { id: true, permission: true, sharedWithAll: true }
                     }
                 },
                 orderBy: { createdAt: 'desc' }
@@ -103,76 +115,33 @@ export class FileService {
         return prisma.file.findUnique({
             where: { id },
             include: {
-                uploadedBy: {
-                    select: {
-                        id: true,
-                        fullName: true,
-                        employeeId: true,
-                        email: true
-                    }
-                },
-                plant: {
-                    select: {
-                        id: true,
-                        name: true,
-                        code: true
-                    }
-                },
-                department: {
-                    select: {
-                        id: true,
-                        name: true,
-                        code: true
-                    }
-                },
+                uploadedBy: { select: { id: true, fullName: true, employeeId: true, email: true } },
+                plant: { select: { id: true, name: true } },
+                department: { select: { id: true, name: true } },
+                section: { select: { id: true, name: true } },
+                folder: { select: { id: true, name: true } },
                 shares: {
                     where: { isActive: true },
                     include: {
-                        sharedWithUser: {
-                            select: {
-                                id: true,
-                                fullName: true,
-                                employeeId: true
-                            }
-                        },
-                        sharedWithPlant: {
-                            select: {
-                                id: true,
-                                name: true,
-                                code: true
-                            }
-                        },
-                        sharedWithDept: {
-                            select: {
-                                id: true,
-                                name: true,
-                                code: true
-                            }
-                        }
+                        sharedWithUser: { select: { id: true, fullName: true, employeeId: true } },
+                        sharedWithPlant: { select: { id: true, name: true } },
+                        sharedWithDept: { select: { id: true, name: true } }
                     }
+                },
+                versions: {
+                    orderBy: { versionNumber: 'desc' },
+                    include: { uploadedBy: { select: { id: true, fullName: true } } }
                 },
                 accessLogs: {
                     take: 10,
                     orderBy: { accessedAt: 'desc' },
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                fullName: true,
-                                employeeId: true
-                            }
-                        }
-                    }
+                    include: { user: { select: { id: true, fullName: true } } }
                 }
             }
         });
     }
 
-    async updateFile(id: string, data: {
-        description?: string;
-        category?: string;
-        isActive?: boolean;
-    }) {
+    async updateFile(id: string, data: any) {
         const updateData: any = { ...data };
         if (data.category) {
             updateData.category = data.category as any;
@@ -194,86 +163,69 @@ export class FileService {
         });
     }
 
-    async canAccessFile(userId: string, fileId: string): Promise<boolean> {
+    async resolveEffectivePermission(userId: string, fileId: string): Promise<string> {
+        // Here we evaluate the user's hierarchy and explicit shares
+        // For simplicity, we fallback to the old role checks if not overridden.
+        // Returning PermissionLevel string like 'VIEW', 'DOWNLOAD', 'MODIFY', 'UPLOAD', 'DELETE', 'MODIFY_ONLINE'
+        
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { 
-                role: true, 
-                plantId: true, 
-                departmentId: true,
-                id: true
-            }
+            select: { role: true, plantId: true, departmentId: true, sectionId: true, id: true }
         });
 
         const file = await prisma.file.findUnique({
             where: { id: fileId },
-            include: {
-                shares: {
-                    where: { isActive: true }
-                }
-            }
+            include: { shares: { where: { isActive: true } } }
         });
 
-        if (!user || !file) return false;
-        
-        // Super admin has access to all files
-        if (user.role === 'SUPER_ADMIN') return true;
-        
-        // User is the uploader
-        if (file.uploadedById === user.id) return true;
-        
-        // Check if file is shared with user's plant
-        const sharedWithPlant = file.shares.some(s => s.sharedWithPlantId === user.plantId);
-        if (sharedWithPlant) return true;
-        
-        // Check if file is shared with user's department
-        const sharedWithDept = file.shares.some(s => s.sharedWithDeptId === user.departmentId);
-        if (sharedWithDept) return true;
-        
-        // Check if file is shared directly with user
-        const sharedWithUser = file.shares.some(s => s.sharedWithUserId === userId);
-        if (sharedWithUser) return true;
-        
-        // Check if file is shared with all employees
-        const sharedWithAll = file.shares.some(s => s.sharedWithAll === true);
-        if (sharedWithAll) return true;
+        if (!user || !file) return 'NONE';
 
-        // Plant admin can access all files in their plant
-        if (user.role === 'PLANT_ADMIN' && user.plantId === file.plantId) return true;
+        // Base cases
+        if (user.role === 'SUPER_ADMIN') return 'UPLOAD'; // Highest
+        if (file.uploadedById === user.id) return 'UPLOAD';
         
-        // Department head can access all files in their department
-        if (user.role === 'DEPARTMENT_HEAD' && user.departmentId === file.departmentId) return true;
+        // Evaluate shares
+        let maxPermLevel = -1;
+        const levels = ['VIEW', 'DOWNLOAD', 'MODIFY', 'MODIFY_ONLINE', 'DELETE', 'UPLOAD'];
+        
+        const updateMax = (perm: string) => {
+            const idx = levels.indexOf(perm);
+            if (idx > maxPermLevel) maxPermLevel = idx;
+        };
 
-        return false;
+        for (const share of file.shares) {
+            if (share.sharedWithAll || 
+                share.sharedWithUserId === user.id ||
+                share.sharedWithPlantId === user.plantId ||
+                share.sharedWithDeptId === user.departmentId) {
+                updateMax(share.permission);
+            }
+        }
+
+        // Implicit hierarchical permissions based on roles
+        if (user.role === 'PLANT_ADMIN' && user.plantId === file.plantId) updateMax('UPLOAD');
+        if (user.role === 'DEPARTMENT_HEAD' && user.departmentId === file.departmentId) updateMax('UPLOAD');
+
+        if (maxPermLevel === -1) return 'NONE';
+        return levels[maxPermLevel];
+    }
+
+    async canAccessFile(userId: string, fileId: string): Promise<boolean> {
+        const perm = await this.resolveEffectivePermission(userId, fileId);
+        return perm !== 'NONE';
+    }
+
+    async canDownloadFile(userId: string, fileId: string): Promise<boolean> {
+        const perm = await this.resolveEffectivePermission(userId, fileId);
+        // MODIFY_ONLINE cannot download
+        if (perm === 'MODIFY_ONLINE') return false; 
+        const levels = ['VIEW', 'DOWNLOAD', 'MODIFY', 'MODIFY_ONLINE', 'DELETE', 'UPLOAD'];
+        return perm !== 'NONE' && levels.indexOf(perm) >= 1; 
     }
 
     async canManageFile(userId: string, fileId: string): Promise<boolean> {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { 
-                role: true, 
-                plantId: true, 
-                departmentId: true,
-                id: true
-            }
-        });
-
-        const file = await prisma.file.findUnique({
-            where: { id: fileId },
-            select: {
-                uploadedById: true,
-                plantId: true,
-                departmentId: true
-            }
-        });
-
-        if (!user || !file) return false;
-        if (user.role === 'SUPER_ADMIN') return true;
-        if (file.uploadedById === user.id) return true;
-        if (user.role === 'PLANT_ADMIN' && user.plantId === file.plantId) return true;
-        if (user.role === 'DEPARTMENT_HEAD' && user.departmentId === file.departmentId) return true;
-
-        return false;
+        const perm = await this.resolveEffectivePermission(userId, fileId);
+        return ['MODIFY', 'DELETE', 'UPLOAD'].includes(perm);
     }
 
     async canManagePlant(userId: string, plantId: string): Promise<boolean> {
@@ -281,11 +233,9 @@ export class FileService {
             where: { id: userId },
             select: { role: true, plantId: true }
         });
-
         if (!user) return false;
         if (user.role === 'SUPER_ADMIN') return true;
         if (user.role === 'PLANT_ADMIN' && user.plantId === plantId) return true;
-
         return false;
     }
 
@@ -293,7 +243,6 @@ export class FileService {
         return new Promise((resolve, reject) => {
             const hash = crypto.createHash('sha256');
             const stream = fs.createReadStream(filePath);
-            
             stream.on('data', data => hash.update(data));
             stream.on('end', () => resolve(hash.digest('hex')));
             stream.on('error', reject);

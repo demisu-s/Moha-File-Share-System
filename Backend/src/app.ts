@@ -13,6 +13,9 @@ import userRoutes from './routes/userRoutes';
 import fileRoutes from './routes/fileRoutes';
 import shareRoutes from './routes/shareRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import sectionRoutes from './routes/sectionRoutes';
+import folderRoutes from './routes/folderRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 dotenv.config();
 
@@ -45,6 +48,9 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/plants', plantRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/sections', sectionRoutes);
+app.use('/api/folders', folderRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/shares', shareRoutes);

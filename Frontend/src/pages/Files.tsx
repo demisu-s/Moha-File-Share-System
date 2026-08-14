@@ -41,13 +41,14 @@ export default function Files() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [sharingFile, setSharingFile] = useState<FileItem | null>(null);
+  const [sharingItem, setSharingItem] = useState<{ type: 'file'|'folder', item: any } | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
 
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -57,9 +58,10 @@ export default function Files() {
     setIsLoading(true);
     setError("");
     try {
-      const folderParam = folderId ? `&folderId=${folderId}` : "&folderId=null";
+      const fileParam = folderId ? `&folderId=${folderId}` : "&folderId=null";
+      const folderParam = folderId ? `&parentFolderId=${folderId}` : "&parentFolderId=null";
       const [filesRes, foldersRes] = await Promise.all([
-        api.get(`/files?limit=100${folderParam}`),
+        api.get(`/files?limit=100${fileParam}`),
         api.get(`/folders?limit=100${folderParam}`)
       ]);
       setFiles(filesRes.data.data.items);
@@ -88,9 +90,20 @@ export default function Files() {
   async function uploadFile(file: File) {
     setIsUploading(true);
     setError("");
+    
+    // Determine category based on file type
+    const type = file.type;
+    let fileCategory = "OTHER";
+    if (type.startsWith("image/")) fileCategory = "IMAGE";
+    else if (type.startsWith("video/")) fileCategory = "VIDEO";
+    else if (type === "application/pdf") fileCategory = "PDF";
+    else if (type.includes("spreadsheet") || type.includes("excel") || type.includes("csv")) fileCategory = "SPREADSHEET";
+    else if (type.includes("presentation") || type.includes("powerpoint")) fileCategory = "PRESENTATION";
+    else if (type.includes("document") || type.includes("word") || type === "text/plain") fileCategory = "DOCUMENT";
+
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("category", "OTHER");
+    formData.append("category", fileCategory);
     if (currentFolderId) {
       formData.append("folderId", currentFolderId);
     }
@@ -147,6 +160,85 @@ export default function Files() {
     const file = e.target.files?.[0];
     if (file) uploadFile(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleFolderSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    setIsUploading(true);
+    setError("");
+
+    try {
+      const paths = new Set<string>();
+      files.forEach(f => {
+        const parts = f.webkitRelativePath.split('/');
+        parts.pop(); // remove file name
+        let currentPath = "";
+        for (const p of parts) {
+          currentPath = currentPath ? `${currentPath}/${p}` : p;
+          paths.add(currentPath);
+        }
+      });
+
+      const sortedPaths = Array.from(paths).sort((a, b) => a.split('/').length - b.split('/').length);
+      const folderIdMap = new Map<string, string>();
+      folderIdMap.set("", currentFolderId || "");
+
+      for (const path of sortedPaths) {
+        const parts = path.split('/');
+        const folderName = parts.pop()!;
+        const parentPath = parts.join('/');
+        const parentId = folderIdMap.get(parentPath);
+
+        const res = await api.post("/folders", {
+          name: folderName,
+          parentFolderId: parentId || null,
+          plantId: user?.plantId,
+          departmentId: user?.departmentId,
+          sectionId: user?.sectionId
+        });
+        
+        folderIdMap.set(path, res.data.data.id);
+      }
+
+      for (const file of files) {
+        const parts = file.webkitRelativePath.split('/');
+        parts.pop();
+        const parentPath = parts.join('/');
+        const folderId = folderIdMap.get(parentPath);
+
+        const type = file.type;
+        let fileCategory = "OTHER";
+        if (type.startsWith("image/")) fileCategory = "IMAGE";
+        else if (type.startsWith("video/")) fileCategory = "VIDEO";
+        else if (type === "application/pdf") fileCategory = "PDF";
+        else if (type.includes("spreadsheet") || type.includes("excel") || type.includes("csv")) fileCategory = "SPREADSHEET";
+        else if (type.includes("presentation") || type.includes("powerpoint")) fileCategory = "PRESENTATION";
+        else if (type.includes("document") || type.includes("word") || type === "text/plain") fileCategory = "DOCUMENT";
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("category", fileCategory);
+        if (folderId) {
+          formData.append("folderId", folderId);
+        }
+        if (user?.plantId) formData.append("plantId", user.plantId);
+        if (user?.departmentId) formData.append("departmentId", user.departmentId);
+        if (user?.sectionId) formData.append("sectionId", user.sectionId);
+
+        await api.post("/files/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      await loadData(currentFolderId);
+    } catch (err: any) {
+      setError(err.response?.data?.error ?? "Folder upload failed.");
+    } finally {
+      setIsUploading(false);
+      if (folderInputRef.current) folderInputRef.current.value = "";
+    }
   }
 
   function handleDragEnter(e: React.DragEvent) {
@@ -226,6 +318,7 @@ export default function Files() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
+          <input ref={folderInputRef} type="file" {...{ webkitdirectory: "", directory: "" }} multiple onChange={handleFolderSelect} className="hidden" />
           <Button
             onClick={() => setIsCreatingFolder(true)}
             variant="outline"
@@ -235,12 +328,21 @@ export default function Files() {
             New Folder
           </Button>
           <Button
+            onClick={() => folderInputRef.current?.click()}
+            disabled={isUploading}
+            variant="outline"
+            className="border-border hover:bg-muted"
+          >
+            <UploadCloud className="size-4 mr-2" />
+            {isUploading ? "..." : "Upload Folder"}
+          </Button>
+          <Button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             className="bg-brand hover:bg-brand/90 text-white"
           >
             <UploadCloud className="size-4 mr-2" />
-            {isUploading ? "Uploading…" : "Upload"}
+            {isUploading ? "Uploading…" : "Upload File"}
           </Button>
         </div>
       </div>
@@ -322,10 +424,15 @@ export default function Files() {
                 <button
                   key={folder.id}
                   onClick={() => navigateToFolder(folder.id, folder.name)}
-                  className="group text-left border border-border rounded-xl p-4 bg-card transition-all duration-200 hover:shadow-md hover:-translate-y-1 hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-light/40"
+                  className="group relative text-left border border-border rounded-xl p-4 bg-card transition-all duration-200 hover:shadow-md hover:-translate-y-1 hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-light/40"
                 >
                   <div className="h-12 w-12 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3">
                     <Folder className="size-6 fill-current opacity-80" />
+                  </div>
+                  <div className="absolute top-2 right-2 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1">
+                    <Button onClick={(e) => { e.stopPropagation(); setSharingItem({ type: 'folder', item: folder }); }} size="sm" variant="ghost" className="h-7 px-2 text-xs hover:bg-brand/10 hover:text-brand" title="Share folder">
+                      Share
+                    </Button>
                   </div>
                   <p className="text-sm font-medium text-foreground truncate">{folder.name}</p>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">Folder</p>
@@ -357,7 +464,7 @@ export default function Files() {
                     </button>
                   </div>
                   <div className="flex gap-1.5 mt-3 pt-3 border-t border-border/50">
-                    <Button onClick={() => setSharingFile(file)} size="sm" variant="ghost" className="flex-1 h-7 text-xs hover:bg-brand/10 hover:text-brand px-0">
+                    <Button onClick={() => setSharingItem({ type: 'file', item: file })} size="sm" variant="ghost" className="flex-1 h-7 text-xs hover:bg-brand/10 hover:text-brand px-0">
                       Share
                     </Button>
                     <Button onClick={() => handleDownload(file)} size="sm" variant="ghost" className="flex-1 h-7 text-xs hover:bg-brand/10 hover:text-brand px-0">
@@ -402,8 +509,9 @@ export default function Files() {
                   </div>
                   <div className="hidden sm:block col-span-3 text-sm text-muted-foreground truncate">{folder.createdBy.fullName}</div>
                   <div className="col-span-3 sm:col-span-2 text-sm text-muted-foreground">-</div>
-                  <div className="col-span-3 sm:col-span-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs">Open</Button>
+                  <div className="col-span-3 sm:col-span-2 text-right opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
+                    <Button onClick={(e) => { e.stopPropagation(); setSharingItem({ type: 'folder', item: folder }); }} size="sm" variant="ghost" className="h-7 px-2 text-xs rounded hover:bg-brand/10 hover:text-brand">Share</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigateToFolder(folder.id, folder.name)}>Open</Button>
                   </div>
                 </div>
               ))}
@@ -423,7 +531,7 @@ export default function Files() {
                   <div className="hidden sm:block col-span-3 text-sm text-muted-foreground truncate">{file.uploadedBy.fullName}</div>
                   <div className="col-span-3 sm:col-span-2 text-sm text-muted-foreground">{formatFileSize(file.fileSize)}</div>
                   <div className="col-span-3 sm:col-span-2 text-right opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
-                    <Button onClick={() => setSharingFile(file)} size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full hover:bg-brand/10 hover:text-brand" title="Share">
+                    <Button onClick={() => setSharingItem({ type: 'file', item: file })} size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full hover:bg-brand/10 hover:text-brand" title="Share">
                       <MoreVertical className="size-4" />
                     </Button>
                     <Button onClick={() => handleDownload(file)} size="sm" variant="ghost" className="h-7 px-2 text-xs rounded hover:bg-brand/10 hover:text-brand">
@@ -437,11 +545,12 @@ export default function Files() {
         </div>
       )}
 
-      {sharingFile && (
+      {sharingItem && (
         <ShareDialog
-          fileId={sharingFile.id}
-          fileName={sharingFile.originalName}
-          onClose={() => setSharingFile(null)}
+          fileId={sharingItem.type === 'file' ? sharingItem.item.id : undefined}
+          folderId={sharingItem.type === 'folder' ? sharingItem.item.id : undefined}
+          itemName={sharingItem.type === 'file' ? sharingItem.item.originalName : sharingItem.item.name}
+          onClose={() => setSharingItem(null)}
           onShared={() => loadData(currentFolderId)}
         />
       )}

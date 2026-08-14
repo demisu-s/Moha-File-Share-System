@@ -12,13 +12,26 @@ interface FileItem {
 interface FilePreviewModalProps {
   file: FileItem;
   onClose: () => void;
-  onDownload: (file: FileItem) => void;
+  onDownload: (file: any) => void | Promise<void>;
 }
 
 export default function FilePreviewModal({ file, onClose, onDownload }: FilePreviewModalProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const ext = file.originalName.split('.').pop()?.toLowerCase() || '';
+  const isImage = file.category === "IMAGE" || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+  const isVideo = file.category === "VIDEO" || ['mp4', 'webm', 'ogg'].includes(ext);
+  const isPdf = file.category === "PDF" || ext === 'pdf';
+  const isPreviewable = isImage || isVideo || isPdf;
+
+  let previewType = file.category;
+  if (previewType === "OTHER") {
+    if (isImage) previewType = "IMAGE";
+    else if (isVideo) previewType = "VIDEO";
+    else if (isPdf) previewType = "PDF";
+  }
 
   useEffect(() => {
     let url: string | null = null;
@@ -38,7 +51,7 @@ export default function FilePreviewModal({ file, onClose, onDownload }: FilePrev
       }
     };
 
-    if (["IMAGE", "VIDEO", "PDF"].includes(file.category)) {
+    if (isPreviewable) {
       fetchFile();
     } else {
       setIsLoading(false);
@@ -47,7 +60,7 @@ export default function FilePreviewModal({ file, onClose, onDownload }: FilePrev
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
-  }, [file.id, file.category]);
+  }, [file.id, file.category, isPreviewable]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -71,7 +84,7 @@ export default function FilePreviewModal({ file, onClose, onDownload }: FilePrev
       );
     }
 
-    if (!blobUrl && !["IMAGE", "VIDEO", "PDF"].includes(file.category)) {
+    if (!blobUrl && !isPreviewable) {
       return (
         <div className="flex flex-col items-center justify-center h-full space-y-4 text-muted-foreground">
           <div className="size-20 bg-muted/50 rounded-full flex items-center justify-center mb-2">
@@ -86,7 +99,7 @@ export default function FilePreviewModal({ file, onClose, onDownload }: FilePrev
       );
     }
 
-    switch (file.category) {
+    switch (previewType) {
       case "IMAGE":
         return <img src={blobUrl!} alt={file.originalName} className="max-w-full max-h-full object-contain mx-auto" />;
       case "VIDEO":

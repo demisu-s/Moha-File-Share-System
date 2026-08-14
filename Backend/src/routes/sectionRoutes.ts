@@ -9,7 +9,7 @@ const sectionController = new SectionController();
 router.post(
     '/',
     authenticate,
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
+    authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
     sectionController.createSection
 );
 
@@ -28,14 +28,14 @@ router.get(
 router.put(
     '/:id',
     authenticate,
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
+    authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
     sectionController.updateSection
 );
 
 router.delete(
     '/:id',
     authenticate,
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
+    authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
     sectionController.deleteSection
 );
 

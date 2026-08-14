@@ -30,15 +30,7 @@ export class FileController {
 
             const validated = fileUploadSchema.parse(req.body);
             
-            if (validated.plantId) {
-                const hasAccess = await this.fileService.canManagePlant(
-                    req.user!.id, 
-                    validated.plantId
-                );
-                if (!hasAccess) {
-                    throw new AppError('You do not have permission to upload files to this plant', 403);
-                }
-            }
+
 
             if (validated.departmentId) {
                 const department = await prisma.department.findUnique({
@@ -55,6 +47,7 @@ export class FileController {
                 uploadedBy: req.user!.id,
                 plantId: validated.plantId,
                 departmentId: validated.departmentId,
+                folderId: validated.folderId,
                 description: validated.description,
                 category: validated.category
             });
@@ -115,7 +108,6 @@ export class FileController {
 
             const shareConditions: any[] = [
                 { sharedWithUserId: req.user?.id },
-                { sharedWithAll: true },
             ];
             if (req.user?.departmentId) {
                 shareConditions.push({ sharedWithDeptId: req.user.departmentId });
@@ -133,11 +125,23 @@ export class FileController {
                 },
             };
 
+            const folderShareFilter = {
+                folder: {
+                    shares: {
+                        some: {
+                            isActive: true,
+                            OR: shareConditions,
+                        },
+                    },
+                },
+            };
+
             // Apply visibility rules based on role
             if (req.user?.role === 'EMPLOYEE' || req.user?.role === 'VIEWER') {
                 where.OR = [
                     { uploadedById: req.user.id },
                     shareFilter,
+                    folderShareFilter,
                 ];
             }
 

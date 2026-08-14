@@ -11,15 +11,17 @@ const NAV_ITEMS = [
   { path: "/files", label: "Files", roles: null, icon: FolderOpen },
   { path: "/shares", label: "Shares", roles: null, icon: Share2 },
   { path: "/reports", label: "Reports", roles: ["SUPER_ADMIN", "PLANT_ADMIN"], icon: LayoutDashboard },
-  { path: "/users", label: "Users", roles: ["SUPER_ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD"], icon: Users },
-  { path: "/plants", label: "Plants", roles: ["SUPER_ADMIN"], icon: Building2 },
-  { path: "/departments", label: "Departments", roles: ["SUPER_ADMIN", "PLANT_ADMIN"], icon: Network },
+  { path: "/users", label: "Users", roles: ["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD", "SECTION_HEAD"], icon: Users },
+  { path: "/plants", label: "Plants", roles: ["SUPER_ADMIN", "ADMIN"], icon: Building2 },
+  { path: "/departments", label: "Departments", roles: ["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN"], icon: Network },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
   PLANT_ADMIN: "Plant Admin",
   DEPARTMENT_HEAD: "Department Head",
+  SECTION_HEAD: "Section Head",
   EMPLOYEE: "Employee",
   VIEWER: "Viewer",
 };
@@ -57,11 +59,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
               key={item.path}
               to={item.path}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-200 border-l-2 ${
-                isActive
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-200 border-l-2 ${isActive
                   ? "bg-brand/10 text-brand border-brand font-semibold shadow-[inset_1px_0_0_0_transparent]"
                   : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground font-medium"
-              }`}
+                }`}
             >
               <Icon className="size-4 shrink-0" />
               {item.label}

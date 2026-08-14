@@ -44,6 +44,40 @@ export class FolderController {
             } else if (parentFolderId) {
                 where.parentFolderId = parentFolderId;
             }
+
+            if (req.user?.role === 'PLANT_ADMIN') {
+                where.plantId = req.user.plantId;
+            }
+            if (req.user?.role === 'DEPARTMENT_HEAD') {
+                where.departmentId = req.user.departmentId;
+            }
+
+            const shareConditions: any[] = [
+                { sharedWithUserId: req.user?.id },
+            ];
+            if (req.user?.departmentId) {
+                shareConditions.push({ sharedWithDeptId: req.user.departmentId });
+            }
+            if (req.user?.plantId) {
+                shareConditions.push({ sharedWithPlantId: req.user.plantId });
+            }
+
+            const shareFilter = {
+                shares: {
+                    some: {
+                        isActive: true,
+                        OR: shareConditions,
+                    },
+                },
+            };
+
+            // Apply visibility rules based on role
+            if (req.user?.role === 'EMPLOYEE' || req.user?.role === 'VIEWER') {
+                where.OR = [
+                    { createdById: req.user.id },
+                    shareFilter,
+                ];
+            }
             
             const folders = await this.folderService.getFolders(where);
             res.json(successResponse(folders));

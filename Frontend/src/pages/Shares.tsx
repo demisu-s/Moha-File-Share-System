@@ -6,8 +6,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 interface Share {
   id: string;
   permission: string;
-  sharedWithAll: boolean;
-  file: { originalName: string };
+  file?: { originalName: string } | null;
+  folder?: { name: string } | null;
   sharedWithUser?: { fullName: string };
   sharedWithDept?: { name: string };
   sharedWithPlant?: { name: string };
@@ -34,7 +34,6 @@ export default function Shares() {
   }
 
   function targetLabel(s: Share) {
-    if (s.sharedWithAll) return "Everyone";
     if (s.sharedWithUser) return s.sharedWithUser.fullName;
     if (s.sharedWithDept) return s.sharedWithDept.name;
     if (s.sharedWithPlant) return s.sharedWithPlant.name;
@@ -70,7 +69,9 @@ export default function Shares() {
           {shares.map((share) => (
             <div key={share.id} className="flex items-center justify-between p-4">
               <div>
-                <p className="text-sm font-medium">{share.file.originalName}</p>
+                <p className="text-sm font-medium">
+                  {share.file ? share.file.originalName : share.folder?.name}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Shared with {targetLabel(share)} · {share.permission.replace("_", " ")}
                 </p>

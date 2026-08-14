@@ -8,7 +8,7 @@ export const registerSchema = z.object({
     employeeId: z.string().min(1, 'Employee ID is required'),
     plantId: z.string().optional(),
     departmentId: z.string().optional(),
-    role: z.enum([ROLES.EMPLOYEE, ROLES.DEPARTMENT_HEAD, ROLES.PLANT_ADMIN, ROLES.VIEWER]).default(ROLES.EMPLOYEE)
+    role: z.enum([ROLES.EMPLOYEE, ROLES.SECTION_HEAD, ROLES.DEPARTMENT_HEAD, ROLES.PLANT_ADMIN, ROLES.VIEWER]).default(ROLES.EMPLOYEE)
 });
 
 // Used by admins to create users — includes SUPER_ADMIN role
@@ -19,7 +19,9 @@ export const createUserSchema = z.object({
     employeeId: z.string().min(1, 'Employee ID is required'),
     plantId: z.string().optional(),
     departmentId: z.string().optional(),
-    role: z.enum([ROLES.SUPER_ADMIN, ROLES.EMPLOYEE, ROLES.DEPARTMENT_HEAD, ROLES.PLANT_ADMIN, ROLES.VIEWER]).default(ROLES.EMPLOYEE)
+    sectionId: z.string().optional(),
+    role: z.enum([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EMPLOYEE, ROLES.SECTION_HEAD, ROLES.DEPARTMENT_HEAD, ROLES.PLANT_ADMIN, ROLES.VIEWER]).default(ROLES.EMPLOYEE),
+    isActive: z.boolean().optional()
 });
 
 export const loginSchema = z.object({
@@ -37,6 +39,7 @@ export const updateUserSchema = z.object({
     phone: z.string().optional(),
     departmentId: z.string().optional(),
     plantId: z.string().optional(),
-    role: z.enum([ROLES.EMPLOYEE, ROLES.DEPARTMENT_HEAD, ROLES.PLANT_ADMIN, ROLES.VIEWER]).optional(),
-    isActive: z.boolean().optional()
+    sectionId: z.string().optional(),
+    role: z.enum([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EMPLOYEE, ROLES.SECTION_HEAD, ROLES.DEPARTMENT_HEAD, ROLES.PLANT_ADMIN, ROLES.VIEWER]).optional(),
+    isActive: z.boolean().optional(),
 });

@@ -18,14 +18,13 @@ router.post('/login', async (req, res, next) => {
             where: { employeeId: validated.employeeId }
         });
 
-        // Check user exists and is active first — same error to prevent enumeration
         if (!user || !user.isActive) {
-            throw new AppError('Invalid credentials', 401);
+            throw new AppError('Incorrect employee ID', 401);
         }
 
         const isValidPassword = await bcrypt.compare(validated.password, user.password);
         if (!isValidPassword) {
-            throw new AppError('Invalid credentials', 401);
+            throw new AppError('Incorrect password', 401);
         }
 
         const token = jwt.sign(

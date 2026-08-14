@@ -19,6 +19,8 @@ export class UserController {
         this.getProfile = this.getProfile.bind(this);
         this.updateProfile = this.updateProfile.bind(this);
         this.changePassword = this.changePassword.bind(this);
+        this.downloadImportTemplate = this.downloadImportTemplate.bind(this);
+        this.bulkImportUsers = this.bulkImportUsers.bind(this);
     }
 
     async createUser(req: Request, res: Response, next: NextFunction) {
@@ -45,6 +47,16 @@ export class UserController {
                 }
             }
 
+            if (validated.sectionId) {
+                const section = await prisma.section.findUnique({
+                    where: { id: validated.sectionId }
+                });
+                
+                if (section && section.departmentId !== validated.departmentId) {
+                    throw new AppError('Section does not belong to the specified department', 400);
+                }
+            }
+
             const hashedPassword = await bcrypt.hash(validated.password, 10);
             
             const user = await this.userService.createUser({
@@ -66,8 +78,18 @@ export class UserController {
             const limit = parseInt(req.query.limit as string) || 10;
             const plantId = req.query.plantId as string;
             const departmentId = req.query.departmentId as string;
+            const status = req.query.status as string;
+            console.log("getAllUsers query:", req.query);
+            let where: any = {};
             
-            let where: any = { isActive: true };
+            if (status === 'active') {
+                where.isActive = true;
+            } else if (status === 'inactive') {
+                where.isActive = false;
+            } else if (!status) {
+                // Default to active if status is not provided, for backward compatibility
+                where.isActive = true;
+            }
             
             if (plantId) {
                 where.plantId = plantId;
@@ -77,12 +99,18 @@ export class UserController {
                 where.departmentId = departmentId;
             }
             
-            if (req.user?.role === 'PLANT_ADMIN') {
-                where.plantId = req.user.plantId;
-            }
-            
-            if (req.user?.role === 'DEPARTMENT_HEAD') {
-                where.departmentId = req.user.departmentId;
+            if (req.query.scope !== 'all') {
+                if (req.user?.role === 'PLANT_ADMIN') {
+                    where.plantId = req.user.plantId;
+                }
+
+                if (req.user?.role === 'ADMIN' && req.user.plantId) {
+                    where.plantId = req.user.plantId;
+                }
+                
+                if (req.user?.role === 'DEPARTMENT_HEAD') {
+                    where.departmentId = req.user.departmentId;
+                }
             }
 
             if (req.query.search) {
@@ -241,6 +269,176 @@ export class UserController {
 
             logger.info(`Password changed for user: ${req.user?.employeeId}`);
             res.json(successResponse(null, 'Password changed successfully'));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadImportTemplate(req: Request, res: Response, next: NextFunction) {
+        try {
+            const XLSX = require('xlsx');
+            
+            const wsData = [
+                ['Full Name', 'Employee ID', 'Email', 'Department', 'Role', 'Password', 'Status']
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Template');
+            
+            const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+            
+            res.setHeader('Content-Disposition', 'attachment; filename="users_import_template.xlsx"');
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.send(buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async bulkImportUsers(req: Request, res: Response, next: NextFunction) {
+        try {
+            if (!req.file) {
+                throw new AppError('No Excel file uploaded', 400);
+            }
+
+            const XLSX = require('xlsx');
+            const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+            
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const data = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as any[];
+
+            const results = {
+                total: data.length,
+                successful: 0,
+                failed: 0,
+                errors: [] as { row: number, reason: string }[]
+            };
+
+            const validUsers = [];
+            const seenEmails = new Set();
+            const seenEmployeeIds = new Set();
+
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+                const rowNum = i + 2;
+
+                const fullName = (row['Full Name'] || '').toString().trim();
+                const employeeId = (row['Employee ID'] || '').toString().trim();
+                const email = (row['Email'] || '').toString().trim();
+                const departmentName = (row['Department'] || '').toString().trim();
+                let role = (row['Role'] || '').toString().trim().toUpperCase().replace(' ', '_');
+                const password = (row['Password'] || '').toString();
+                const statusStr = (row['Status'] || '').toString().trim().toLowerCase();
+                
+                if (!fullName || !employeeId || !email || !password) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Missing required fields (Full Name, Employee ID, Email, Password)' });
+                    continue;
+                }
+
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Invalid email format' });
+                    continue;
+                }
+
+                if (password.length < 8) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Password must be at least 8 characters' });
+                    continue;
+                }
+
+                const validRoles = ['SUPER_ADMIN', 'ADMIN', 'PLANT_ADMIN', 'DEPARTMENT_HEAD', 'SECTION_HEAD', 'EMPLOYEE', 'VIEWER'];
+                if (role && !validRoles.includes(role)) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+                    continue;
+                }
+                
+                if (role) {
+                    const canAssign = await this.userService.canAssignRole(req.user!.id, role);
+                    if (!canAssign) {
+                        results.failed++;
+                        results.errors.push({ row: rowNum, reason: `You do not have permission to assign the role: ${role}` });
+                        continue;
+                    }
+                }
+                if (!role) role = 'EMPLOYEE';
+
+                let isActive = true;
+                if (statusStr === 'inactive' || statusStr === 'false' || statusStr === '0') {
+                    isActive = false;
+                }
+
+                if (seenEmails.has(email)) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Duplicate email in excel file' });
+                    continue;
+                }
+                seenEmails.add(email);
+
+                if (seenEmployeeIds.has(employeeId)) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Duplicate employee ID in excel file' });
+                    continue;
+                }
+                seenEmployeeIds.add(employeeId);
+
+                const existingEmail = await prisma.user.findUnique({ where: { email } });
+                if (existingEmail) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Email already exists in database' });
+                    continue;
+                }
+
+                const existingEmpId = await prisma.user.findUnique({ where: { employeeId } });
+                if (existingEmpId) {
+                    results.failed++;
+                    results.errors.push({ row: rowNum, reason: 'Employee ID already exists in database' });
+                    continue;
+                }
+
+                let departmentId = undefined;
+                let plantId = undefined;
+
+                if (departmentName) {
+                    const dept = await prisma.department.findFirst({
+                        where: { name: departmentName },
+                        include: { plant: true }
+                    });
+                    
+                    if (!dept) {
+                        results.failed++;
+                        results.errors.push({ row: rowNum, reason: `Department '${departmentName}' not found` });
+                        continue;
+                    }
+                    departmentId = dept.id;
+                    plantId = dept.plantId;
+                }
+
+                const hashedPassword = await bcrypt.hash(password, 10);
+
+                validUsers.push({
+                    fullName,
+                    employeeId,
+                    email,
+                    password: hashedPassword,
+                    role,
+                    isActive,
+                    departmentId,
+                    plantId,
+                });
+            }
+
+            if (validUsers.length > 0) {
+                await this.userService.bulkCreateUsers(validUsers, req.user!.id);
+                results.successful = validUsers.length;
+            }
+
+            logger.info(`Bulk user import completed by ${req.user?.employeeId}: ${results.successful} successful, ${results.failed} failed`);
+            res.json(successResponse(results, 'Bulk import completed'));
         } catch (error) {
             next(error);
         }

@@ -81,7 +81,7 @@ function Dashboard() {
   const quickActions = [
     { label: "Upload a file", icon: UploadCloud, path: "/files" },
     { label: "Share a file", icon: Share2, path: "/files" },
-    ...(["SUPER_ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD"].includes(user?.role ?? "")
+    ...(["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD", "SECTION_HEAD"].includes(user?.role ?? "")
       ? [{ label: "Manage users", icon: UsersIcon, path: "/users" }]
       : []),
   ];
@@ -283,7 +283,7 @@ function App() {
             <Route
               path="/users"
               element={
-                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD"]}>
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD", "SECTION_HEAD"]}>
                   <UsersList />
                 </ProtectedRoute>
               }
@@ -291,7 +291,7 @@ function App() {
             <Route
               path="/plants"
               element={
-                <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
                   <Plants />
                 </ProtectedRoute>
               }
@@ -299,7 +299,7 @@ function App() {
             <Route
               path="/departments"
               element={
-                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "PLANT_ADMIN"]}>
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN"]}>
                   <Departments />
                 </ProtectedRoute>
               }

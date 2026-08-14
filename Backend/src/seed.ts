@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 async function seed() {
     console.log('🌱 Seeding database...');
     console.log('═══════════════════════════════════════');
-    
+
     try {
         // ============================================
         // 1. CREATE SUPER ADMIN
@@ -39,8 +39,6 @@ async function seed() {
                 name: 'Main Factory',
                 code: 'PLT-001',
                 location: 'Addis Ababa',
-                address: 'Bole Road, Addis Ababa, Ethiopia',
-                phone: '+251-111-234567',
                 email: 'mainfactory@moha.com',
                 createdBy: superAdmin.id
             }
@@ -52,8 +50,6 @@ async function seed() {
                 name: 'Branch Office',
                 code: 'PLT-002',
                 location: 'Dire Dawa',
-                address: 'Dire Dawa Main Road, Dire Dawa, Ethiopia',
-                phone: '+251-251-123456',
                 email: 'branchoffice@moha.com',
                 createdBy: superAdmin.id
             }
@@ -113,7 +109,7 @@ async function seed() {
         // 3.5 CREATE SECTIONS
         // ============================================
         console.log('\n📐 Creating Sections...');
-        
+
         const sec1 = await prisma.section.create({
             data: {
                 name: 'Recruitment',
@@ -386,17 +382,17 @@ async function seed() {
         // ============================================
         console.log('\n🔗 Creating file shares...');
 
-        // Share file1 (Employee Handbook) with all employees
+        // Share file1 (Employee Handbook) with plant
         const share1 = await prisma.fileShare.create({
             data: {
                 fileId: file1.id,
                 sharedBy: deptHead1.id,
-                sharedWithAll: true,
+                sharedWithPlantId: plant1.id,
                 permission: 'VIEW',
                 isActive: true
             }
         });
-        console.log(`✅ File shared with all employees: ${file1.fileName}`);
+        console.log(`✅ File shared with plant: ${file1.fileName}`);
 
         // Share file2 (Financial Report) with specific department
         const share2 = await prisma.fileShare.create({
@@ -468,7 +464,7 @@ async function seed() {
         console.log(`   📄 Files: 3`);
         console.log(`   🔗 File Shares: 3`);
         console.log(`   🔔 Notifications: 3`);
-        
+
         console.log('\n📋 Login Credentials:');
         console.log('   🟢 Super Admin: superadmin@moha.com / SuperAdmin123!');
         console.log('   🟢 Plant Admin 1: admin@factory.moha.com / PlantAdmin123!');

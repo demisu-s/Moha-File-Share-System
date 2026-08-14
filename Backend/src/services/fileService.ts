@@ -100,7 +100,7 @@ export class FileService {
                     folder: { select: { id: true, name: true } },
                     shares: {
                         where: { isActive: true },
-                        select: { id: true, permission: true, sharedWithAll: true }
+                        select: { id: true, permission: true }
                     }
                 },
                 orderBy: { createdAt: 'desc' }
@@ -184,7 +184,7 @@ export class FileService {
         if (user.role === 'SUPER_ADMIN') return 'UPLOAD'; // Highest
         if (file.uploadedById === user.id) return 'UPLOAD';
         
-        // Evaluate shares
+        // Evaluate file shares
         let maxPermLevel = -1;
         const levels = ['VIEW', 'DOWNLOAD', 'MODIFY', 'MODIFY_ONLINE', 'DELETE', 'UPLOAD'];
         
@@ -193,13 +193,30 @@ export class FileService {
             if (idx > maxPermLevel) maxPermLevel = idx;
         };
 
-        for (const share of file.shares) {
-            if (share.sharedWithAll || 
-                share.sharedWithUserId === user.id ||
-                share.sharedWithPlantId === user.plantId ||
-                share.sharedWithDeptId === user.departmentId) {
-                updateMax(share.permission);
+        const evaluateShares = (shares: any[]) => {
+            for (const share of shares) {
+                if ( 
+                    share.sharedWithUserId === user.id ||
+                    share.sharedWithPlantId === user.plantId ||
+                    share.sharedWithDeptId === user.departmentId) {
+                    updateMax(share.permission);
+                }
             }
+        };
+
+        evaluateShares(file.shares);
+
+        // Evaluate folder shares up the tree
+        let currentFolderId = file.folderId;
+        while (currentFolderId) {
+            const folder = await prisma.folder.findUnique({
+                where: { id: currentFolderId },
+                include: { shares: { where: { isActive: true } } }
+            });
+            if (!folder) break;
+            
+            evaluateShares(folder.shares);
+            currentFolderId = folder.parentFolderId;
         }
 
         // Implicit hierarchical permissions based on roles

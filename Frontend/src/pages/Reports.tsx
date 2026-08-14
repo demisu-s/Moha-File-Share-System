@@ -126,7 +126,7 @@ export default function Reports() {
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: number) => formatFileSize(value)} />
+                  <RechartsTooltip formatter={(value: any) => formatFileSize(Number(value))} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { SectionService } from '../services/sectionService';
+import { DepartmentService } from '../services/departmentService';
+import { createSectionSchema, updateSectionSchema } from '../validators/sectionValidator';
 import { successResponse } from '../utils/response';
 import { AppError } from '../middleware/errorHandler';
 
 export class SectionController {
     private sectionService = new SectionService();
+    private departmentService = new DepartmentService();
 
     constructor() {
         this.createSection = this.createSection.bind(this);
@@ -16,13 +19,20 @@ export class SectionController {
 
     async createSection(req: Request, res: Response, next: NextFunction) {
         try {
-            const { name, departmentId, description } = req.body;
-            if (!name || !departmentId) {
-                throw new AppError('Name and departmentId are required', 400);
+            const validated = createSectionSchema.parse(req.body);
+            const { name, departmentId, description } = validated;
+
+            const hasAccess = await this.departmentService.canManageDepartment(req.user!.id, departmentId);
+            if (!hasAccess) {
+                throw new AppError('You do not have permission to manage sections in this department', 403);
             }
+
             const section = await this.sectionService.createSection({ name, departmentId, description });
             res.status(201).json(successResponse(section, 'Section created successfully'));
-        } catch (error) {
+        } catch (error: any) {
+            if (error.code === 'P2002') {
+                return next(new AppError('A section with this name already exists in the selected department', 400));
+            }
             next(error);
         }
     }
@@ -42,7 +52,7 @@ export class SectionController {
 
     async getSectionById(req: Request, res: Response, next: NextFunction) {
         try {
-            const section = await this.sectionService.getSectionById(req.params.id as string);
+            const section = await this.sectionService.getSectionById(String(req.params.id));
             if (!section) throw new AppError('Section not found', 404);
             res.json(successResponse(section));
         } catch (error) {
@@ -52,16 +62,35 @@ export class SectionController {
 
     async updateSection(req: Request, res: Response, next: NextFunction) {
         try {
-            const section = await this.sectionService.updateSection(req.params.id as string, req.body);
-            res.json(successResponse(section, 'Section updated successfully'));
-        } catch (error) {
+            const section = await this.sectionService.getSectionById(String(req.params.id));
+            if (!section) throw new AppError('Section not found', 404);
+
+            const hasAccess = await this.departmentService.canManageDepartment(req.user!.id, section.departmentId);
+            if (!hasAccess) {
+                throw new AppError('You do not have permission to update this section', 403);
+            }
+
+            const updated = await this.sectionService.updateSection(String(req.params.id), updateSectionSchema.parse(req.body));
+            res.json(successResponse(updated, 'Section updated successfully'));
+        } catch (error: any) {
+            if (error.code === 'P2002') {
+                return next(new AppError('A section with this name already exists in the selected department', 400));
+            }
             next(error);
         }
     }
 
     async deleteSection(req: Request, res: Response, next: NextFunction) {
         try {
-            await this.sectionService.deleteSection(req.params.id as string);
+            const section = await this.sectionService.getSectionById(String(req.params.id));
+            if (!section) throw new AppError('Section not found', 404);
+
+            const hasAccess = await this.departmentService.canManageDepartment(req.user!.id, section.departmentId);
+            if (!hasAccess) {
+                throw new AppError('You do not have permission to delete this section', 403);
+            }
+
+            await this.sectionService.deleteSection(String(req.params.id));
             res.json(successResponse(null, 'Section deleted successfully'));
         } catch (error) {
             next(error);

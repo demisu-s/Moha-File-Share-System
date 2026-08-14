@@ -41,6 +41,11 @@ export const errorHandler = (
                 error: 'Record not found'
             });
         }
+        if (prismaError.code === 'P2003') {
+            return res.status(400).json({
+                error: 'Related record not found (invalid ID provided)'
+            });
+        }
     }
 
     // Handle JWT errors

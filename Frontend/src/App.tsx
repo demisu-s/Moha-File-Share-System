@@ -13,10 +13,12 @@ import Login from "@/pages/Login";
 import Landing from "@/pages/Landing";
 import UsersList from "@/pages/UsersList";
 import Files from "@/pages/Files";
+import RecycleBin from "@/pages/RecycleBin";
 import Plants from "@/pages/Plants";
 import Departments from "@/pages/Departments";
 import Shares from "@/pages/Shares";
 import Reports from "@/pages/Reports";
+import Settings from "@/pages/Settings";
 
 interface Stats {
   totalUsers: number;
@@ -261,16 +263,26 @@ function ProtectedRoute({
   return <AppShell>{children}</AppShell>;
 }
 
+import UserPermissions from "@/components/users/UserPermissions";
+import { Toaster } from "sonner";
+
 function App() {
   return (
     <ThemeProvider>
+      <Toaster position="top-right" />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/permissions-demo" element={
+              <div className="flex min-h-screen items-center justify-center bg-background p-4">
+                <UserPermissions />
+              </div>
+            } />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/files" element={<ProtectedRoute><Files /></ProtectedRoute>} />
+            <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
             <Route path="/shares" element={<ProtectedRoute><Shares /></ProtectedRoute>} />
             <Route
               path="/reports"
@@ -301,6 +313,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN"]}>
                   <Departments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

@@ -11,6 +11,14 @@ const server = app.listen(PORT, () => {
     console.log(`🔐 JWT Secret: ${process.env.JWT_SECRET ? '✅ Set' : '❌ Not set'}`);
 });
 
+server.on('error', (err) => {
+    console.error('Express server error:', err);
+});
+
+setInterval(() => {
+    // Keep event loop alive
+}, 60000);
+
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
@@ -23,5 +31,4 @@ process.on('unhandledRejection', (error) => {
     console.error('Unhandled Rejection:', error);
 });
 
-export default server;// trigger restart
- 
+export default server; // trigger restart 2

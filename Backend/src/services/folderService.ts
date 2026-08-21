@@ -36,6 +36,26 @@ export class FolderService {
     }
 
     async deleteFolder(id: string) {
+        return prisma.folder.update({
+            where: { id },
+            data: {
+                isDeleted: true,
+                deletedAt: new Date()
+            }
+        });
+    }
+
+    async restoreFolder(id: string) {
+        return prisma.folder.update({
+            where: { id },
+            data: {
+                isDeleted: false,
+                deletedAt: null
+            }
+        });
+    }
+
+    async hardDeleteFolder(id: string) {
         return prisma.folder.delete({ where: { id } });
     }
 }

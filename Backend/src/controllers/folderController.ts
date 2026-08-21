@@ -2,7 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { FolderService } from '../services/folderService';
 import { successResponse } from '../utils/response';
 import { AppError } from '../middleware/errorHandler';
-
+import { permissionService } from '../services/permissionService';
+import { prisma } from '../config/database';
+import { logger } from '../utils/logger';
 export class FolderController {
     private folderService = new FolderService();
 
@@ -24,6 +26,17 @@ export class FolderController {
             const folder = await this.folderService.createFolder({
                 name, description, plantId, departmentId, sectionId, parentFolderId, createdById: req.user!.id
             });
+
+            prisma.auditLog.create({
+                data: {
+                    userId: req.user!.id,
+                    action: 'CREATE',
+                    resourceType: 'FOLDER',
+                    resourceId: folder.id,
+                    details: { name: folder.name }
+                }
+            }).catch(err => logger.error('Audit log failed:', err));
+
             res.status(201).json(successResponse(folder, 'Folder created successfully'));
         } catch (error) {
             next(error);
@@ -80,7 +93,15 @@ export class FolderController {
             }
             
             const folders = await this.folderService.getFolders(where);
-            res.json(successResponse(folders));
+
+            const foldersWithPerms = await Promise.all(
+                folders.map(async (folder) => {
+                    const effectivePermission = await permissionService.getEffectivePermission(req.user!.id, folder.id, 'FOLDER');
+                    return { ...folder, effectivePermission: effectivePermission || 'NONE' };
+                })
+            );
+
+            res.json(successResponse(foldersWithPerms));
         } catch (error) {
             next(error);
         }
@@ -99,6 +120,17 @@ export class FolderController {
     async updateFolder(req: Request, res: Response, next: NextFunction) {
         try {
             const folder = await this.folderService.updateFolder(req.params.id as string, req.body);
+            
+            prisma.auditLog.create({
+                data: {
+                    userId: req.user!.id,
+                    action: 'UPDATE',
+                    resourceType: 'FOLDER',
+                    resourceId: folder.id,
+                    details: { name: folder.name }
+                }
+            }).catch(err => logger.error('Audit log failed:', err));
+
             res.json(successResponse(folder, 'Folder updated successfully'));
         } catch (error) {
             next(error);
@@ -108,6 +140,17 @@ export class FolderController {
     async deleteFolder(req: Request, res: Response, next: NextFunction) {
         try {
             await this.folderService.deleteFolder(req.params.id as string);
+            
+            prisma.auditLog.create({
+                data: {
+                    userId: req.user!.id,
+                    action: 'DELETE',
+                    resourceType: 'FOLDER',
+                    resourceId: req.params.id as string,
+                    details: { folderId: req.params.id as string }
+                }
+            }).catch(err => logger.error('Audit log failed:', err));
+
             res.json(successResponse(null, 'Folder deleted successfully'));
         } catch (error) {
             next(error);

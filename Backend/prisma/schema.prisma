@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -84,6 +84,8 @@ model Folder {
   id          String   @id @default(cuid())
   name        String
   description String?
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -114,9 +116,11 @@ model User {
   employeeId   String    @unique
   phone        String?
   profileImage String?
-  isActive     Boolean   @default(true)
-  lastLogin    DateTime?
-  createdAt    DateTime  @default(now())
+  isActive        Boolean   @default(true)
+  accountStatus   String    @default("ACTIVE")
+  lastLogin       DateTime?
+  lastFailedLogin DateTime?
+  createdAt       DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   // Relations - Hierarchical
@@ -189,6 +193,7 @@ model FileVersion {
   filePath      String
   fileSize      Int
   originalName  String
+  fileHash      String?
   uploadedById  String
   uploadedBy    User     @relation(fields: [uploadedById], references: [id])
   createdAt     DateTime @default(now())
@@ -219,7 +224,17 @@ model FileShare {
   permission PermissionLevel @default(VIEW)
   expiresAt  DateTime?
   isActive   Boolean         @default(true)
+  isOverride Boolean         @default(false)
+  inheritedFromId String?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

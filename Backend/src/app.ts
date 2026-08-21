@@ -16,6 +16,7 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import sectionRoutes from './routes/sectionRoutes';
 import folderRoutes from './routes/folderRoutes';
 import reportRoutes from './routes/reportRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/shares', shareRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404 handler
 app.use((req, res) => {

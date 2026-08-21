@@ -36,13 +36,37 @@ interface TreeNode {
 
 export default function ShareDialog({ fileId, folderId, itemName, onClose, onShared }: Props) {
   const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>([]);
-  const [permission, setPermission] = useState("VIEW");
-  
+  const [permissionsState, setPermissionsState] = useState({
+    view: true,
+    edit: false,
+    delete: false,
+    share: false,
+    fullControl: false,
+  });
+
   const [users, setUsers] = useState<UserData[]>([]);
   const [departments, setDepartments] = useState<DepartmentData[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [plants, setPlants] = useState<PlantData[]>([]);
-  
+
+  const handleCheckboxChange = (name: keyof typeof permissionsState, checked: boolean) => {
+    if (name === "fullControl") {
+      setPermissionsState((prev) => ({
+        ...prev,
+        fullControl: checked,
+        view: checked ? true : prev.view,
+        edit: checked ? true : prev.edit,
+        delete: checked ? true : prev.delete,
+        share: checked ? true : prev.share,
+      }));
+    } else {
+      setPermissionsState((prev) => ({
+        ...prev,
+        [name]: checked,
+      }));
+    }
+  };
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -243,11 +267,17 @@ export default function ShareDialog({ fileId, folderId, itemName, onClose, onSha
         id: t.id
       }));
 
+      let finalPermission = "VIEW";
+      if (permissionsState.fullControl) finalPermission = "FULL_CONTROL";
+      else if (permissionsState.share) finalPermission = "SHARE";
+      else if (permissionsState.delete) finalPermission = "DELETE";
+      else if (permissionsState.edit) finalPermission = "EDIT";
+
       await api.post("/shares", {
         fileId,
         folderId,
         targets: targetsPayload,
-        permission
+        permission: finalPermission
       });
       onShared();
       onClose();
@@ -403,19 +433,52 @@ export default function ShareDialog({ fileId, folderId, itemName, onClose, onSha
                 </div>
               </div>
 
-              <div className="space-y-1.5 shrink-0">
-                <label className="text-sm font-medium text-foreground">Permission Level</label>
-                <select
-                  value={permission}
-                  onChange={(e) => setPermission(e.target.value)}
-                  className="w-full h-9 px-2.5 rounded-md border border-border bg-background text-sm focus:ring-1 focus:ring-brand"
-                >
-                  {PERMISSIONS.map((p) => (
-                    <option key={p} value={p}>
-                      {p.replace("_", " ")}
-                    </option>
+              <div className="space-y-1.5 shrink-0 flex-1 overflow-y-auto">
+                <label className="text-sm font-medium text-foreground mb-2 block">Permission Level</label>
+                <div className="space-y-2">
+                  {[
+                    { id: "fullControl", label: "Full Control", description: "Grants all access and permissions." },
+                    { id: "view", label: "View", description: "Can view files and folders." },
+                    { id: "edit", label: "Edit", description: "Can modify existing files." },
+                    { id: "delete", label: "Delete", description: "Can delete files." },
+                    { id: "share", label: "Share", description: "Can share files with other users." },
+                  ].map((perm) => (
+                    <div
+                      key={perm.id}
+                      className={`flex items-start space-x-2.5 p-2 rounded-lg border transition-colors ${
+                        permissionsState[perm.id as keyof typeof permissionsState]
+                          ? "bg-teal-500/10 border-teal-500/30"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="flex items-center h-5 mt-0.5">
+                        <input
+                          id={perm.id}
+                          type="checkbox"
+                          className="w-3.5 h-3.5 rounded border-border text-teal-600 focus:ring-teal-500 disabled:opacity-50 cursor-pointer accent-teal-600"
+                          checked={permissionsState[perm.id as keyof typeof permissionsState]}
+                          disabled={perm.id !== "fullControl" && permissionsState.fullControl}
+                          onChange={(e) =>
+                            handleCheckboxChange(perm.id as keyof typeof permissionsState, e.target.checked)
+                          }
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={perm.id}
+                          className={`text-xs font-medium leading-none cursor-pointer ${
+                            perm.id !== "fullControl" && permissionsState.fullControl ? "opacity-50" : "text-foreground"
+                          }`}
+                        >
+                          {perm.label}
+                        </label>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                          {perm.description}
+                        </p>
+                      </div>
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
           </div>

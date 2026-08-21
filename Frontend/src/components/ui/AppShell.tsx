@@ -3,17 +3,19 @@ import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, FolderOpen, Users, Building2, Network, Share2, Sun, Moon, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Users, Building2, Network, Share2, Sun, Moon, Menu, X, LogOut, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", roles: null, icon: LayoutDashboard },
   { path: "/files", label: "Files", roles: null, icon: FolderOpen },
   { path: "/shares", label: "Shares", roles: null, icon: Share2 },
+  { path: "/recycle-bin", label: "Recycle Bin", roles: null, icon: Trash2 },
   { path: "/reports", label: "Reports", roles: ["SUPER_ADMIN", "PLANT_ADMIN"], icon: LayoutDashboard },
   { path: "/users", label: "Users", roles: ["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD", "SECTION_HEAD"], icon: Users },
   { path: "/plants", label: "Plants", roles: ["SUPER_ADMIN", "ADMIN"], icon: Building2 },
   { path: "/departments", label: "Departments", roles: ["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN"], icon: Network },
+  { path: "/settings", label: "Settings", roles: ["SUPER_ADMIN"], icon: SettingsIcon },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

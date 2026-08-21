@@ -3,6 +3,7 @@ import { AppError } from '../middleware/errorHandler';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { permissionService } from './permissionService';
 
 export class FileService {
     async uploadFile(data: {
@@ -38,6 +39,7 @@ export class FileService {
                     filePath: existingFile.filePath,
                     fileSize: existingFile.fileSize,
                     originalName: existingFile.originalName,
+                    fileHash: existingFile.fileHash,
                     uploadedById: existingFile.uploadedById
                 }
             });
@@ -141,6 +143,57 @@ export class FileService {
         });
     }
 
+    async getFileVersions(fileId: string) {
+        return prisma.fileVersion.findMany({
+            where: { fileId },
+            orderBy: { versionNumber: 'desc' },
+            include: { uploadedBy: { select: { id: true, fullName: true, employeeId: true } } }
+        });
+    }
+
+    async getFileVersionById(versionId: string) {
+        return prisma.fileVersion.findUnique({
+            where: { id: versionId }
+        });
+    }
+
+    async restoreFileVersion(fileId: string, versionId: string, userId: string) {
+        const file = await prisma.file.findUnique({ where: { id: fileId } });
+        if (!file) throw new AppError('File not found', 404);
+
+        const version = await prisma.fileVersion.findUnique({ where: { id: versionId } });
+        if (!version) throw new AppError('Version not found', 404);
+        if (version.fileId !== fileId) throw new AppError('Version mismatch', 400);
+
+        // Create new version backup from current state
+        await prisma.fileVersion.create({
+            data: {
+                fileId: file.id,
+                versionNumber: file.version,
+                filePath: file.filePath,
+                fileSize: file.fileSize,
+                originalName: file.originalName,
+                fileHash: file.fileHash,
+                uploadedById: file.uploadedById
+            }
+        });
+
+        // Restore file data from version, but increment version number
+        return prisma.file.update({
+            where: { id: fileId },
+            data: {
+                fileName: path.basename(version.filePath), 
+                originalName: version.originalName,
+                fileSize: version.fileSize,
+                filePath: version.filePath,
+                fileHash: version.fileHash,
+                version: file.version + 1,
+                uploadedById: userId,
+                updatedAt: new Date()
+            }
+        });
+    }
+
     async updateFile(id: string, data: any) {
         const updateData: any = { ...data };
         if (data.category) {
@@ -163,86 +216,102 @@ export class FileService {
         });
     }
 
-    async resolveEffectivePermission(userId: string, fileId: string): Promise<string> {
-        // Here we evaluate the user's hierarchy and explicit shares
-        // For simplicity, we fallback to the old role checks if not overridden.
-        // Returning PermissionLevel string like 'VIEW', 'DOWNLOAD', 'MODIFY', 'UPLOAD', 'DELETE', 'MODIFY_ONLINE'
-        
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { role: true, plantId: true, departmentId: true, sectionId: true, id: true }
-        });
+    async getDeletedFiles(where: any, page: number, limit: number) {
+        const skip = (page - 1) * limit;
 
-        const file = await prisma.file.findUnique({
-            where: { id: fileId },
-            include: { shares: { where: { isActive: true } } }
-        });
+        const [items, total] = await Promise.all([
+            prisma.file.findMany({
+                where: { ...where, isDeleted: true },
+                skip,
+                take: limit,
+                include: {
+                    uploadedBy: { select: { id: true, fullName: true, employeeId: true } },
+                    plant: { select: { id: true, name: true } },
+                    department: { select: { id: true, name: true } },
+                    section: { select: { id: true, name: true } },
+                    folder: { select: { id: true, name: true } }
+                },
+                orderBy: { deletedAt: 'desc' }
+            }),
+            prisma.file.count({ where: { ...where, isDeleted: true } })
+        ]);
 
-        if (!user || !file) return 'NONE';
+        return { items, total };
+    }
 
-        // Base cases
-        if (user.role === 'SUPER_ADMIN') return 'UPLOAD'; // Highest
-        if (file.uploadedById === user.id) return 'UPLOAD';
-        
-        // Evaluate file shares
-        let maxPermLevel = -1;
-        const levels = ['VIEW', 'DOWNLOAD', 'MODIFY', 'MODIFY_ONLINE', 'DELETE', 'UPLOAD'];
-        
-        const updateMax = (perm: string) => {
-            const idx = levels.indexOf(perm);
-            if (idx > maxPermLevel) maxPermLevel = idx;
-        };
-
-        const evaluateShares = (shares: any[]) => {
-            for (const share of shares) {
-                if ( 
-                    share.sharedWithUserId === user.id ||
-                    share.sharedWithPlantId === user.plantId ||
-                    share.sharedWithDeptId === user.departmentId) {
-                    updateMax(share.permission);
-                }
+    async restoreFile(id: string) {
+        return prisma.file.update({
+            where: { id },
+            data: { 
+                isDeleted: false, 
+                isActive: true,
+                deletedAt: null
             }
-        };
+        });
+    }
 
-        evaluateShares(file.shares);
+    async hardDeleteFile(id: string) {
+        return prisma.file.delete({
+            where: { id }
+        });
+    }
 
-        // Evaluate folder shares up the tree
-        let currentFolderId = file.folderId;
-        while (currentFolderId) {
-            const folder = await prisma.folder.findUnique({
-                where: { id: currentFolderId },
-                include: { shares: { where: { isActive: true } } }
-            });
-            if (!folder) break;
-            
-            evaluateShares(folder.shares);
-            currentFolderId = folder.parentFolderId;
+    async moveFile(id: string, newFolderId: string | null) {
+        return prisma.file.update({
+            where: { id },
+            data: { folderId: newFolderId }
+        });
+    }
+
+    async copyFile(id: string, newFolderId: string | null, userId: string) {
+        const file = await prisma.file.findUnique({ where: { id } });
+        if (!file) throw new AppError('File not found', 404);
+
+        let newFilePath = file.filePath;
+        const oldAbsPath = path.join(process.cwd(), 'uploads', file.filePath);
+        
+        if (fs.existsSync(oldAbsPath)) {
+            const ext = path.extname(file.filePath);
+            newFilePath = crypto.randomBytes(16).toString('hex') + ext;
+            const newAbsPath = path.join(process.cwd(), 'uploads', newFilePath);
+            fs.copyFileSync(oldAbsPath, newAbsPath);
         }
 
-        // Implicit hierarchical permissions based on roles
-        if (user.role === 'PLANT_ADMIN' && user.plantId === file.plantId) updateMax('UPLOAD');
-        if (user.role === 'DEPARTMENT_HEAD' && user.departmentId === file.departmentId) updateMax('UPLOAD');
+        return prisma.file.create({
+            data: {
+                fileName: `Copy of ${file.fileName}`,
+                originalName: `Copy of ${file.originalName}`,
+                fileSize: file.fileSize,
+                fileType: file.fileType,
+                mimeType: file.mimeType,
+                filePath: newFilePath,
+                fileHash: file.fileHash,
+                plantId: file.plantId,
+                departmentId: file.departmentId,
+                sectionId: file.sectionId,
+                folderId: newFolderId,
+                uploadedById: userId,
+                description: file.description,
+                category: file.category
+            }
+        });
+    }
 
-        if (maxPermLevel === -1) return 'NONE';
-        return levels[maxPermLevel];
+    async resolveEffectivePermission(userId: string, fileId: string): Promise<string> {
+        const perm = await permissionService.getEffectivePermission(userId, fileId, 'FILE');
+        return perm || 'NONE';
     }
 
     async canAccessFile(userId: string, fileId: string): Promise<boolean> {
-        const perm = await this.resolveEffectivePermission(userId, fileId);
-        return perm !== 'NONE';
+        return permissionService.hasPermission(userId, fileId, 'FILE', 'VIEW');
     }
 
     async canDownloadFile(userId: string, fileId: string): Promise<boolean> {
-        const perm = await this.resolveEffectivePermission(userId, fileId);
-        // MODIFY_ONLINE cannot download
-        if (perm === 'MODIFY_ONLINE') return false; 
-        const levels = ['VIEW', 'DOWNLOAD', 'MODIFY', 'MODIFY_ONLINE', 'DELETE', 'UPLOAD'];
-        return perm !== 'NONE' && levels.indexOf(perm) >= 1; 
+        return permissionService.hasPermission(userId, fileId, 'FILE', 'DOWNLOAD');
     }
 
     async canManageFile(userId: string, fileId: string): Promise<boolean> {
-        const perm = await this.resolveEffectivePermission(userId, fileId);
-        return ['MODIFY', 'DELETE', 'UPLOAD'].includes(perm);
+        return permissionService.hasPermission(userId, fileId, 'FILE', 'MODIFY');
     }
 
     async canManagePlant(userId: string, plantId: string): Promise<boolean> {

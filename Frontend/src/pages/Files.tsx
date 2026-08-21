@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import ShareDialog from "@/components/ui/ShareDialog";
 import FilePreviewModal from "@/components/ui/FilePreviewModal";
-import { LayoutGrid, List, Search, UploadCloud, Folder, ChevronRight, History, MoreVertical, FileText } from "lucide-react";
+import FileVersionModal from "@/components/ui/FileVersionModal";
+import MoveCopyModal from "@/components/ui/MoveCopyModal";
+import FileDetailsModal from "@/components/ui/FileDetailsModal";
+import { LayoutGrid, List, Search, UploadCloud, Folder, ChevronRight, History, MoreVertical, FileText, Trash2, MoveRight, CopyPlus, Share2, Download, Info } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -19,6 +23,7 @@ interface FileItem {
   createdAt: string;
   version: number;
   uploadedBy: { fullName: string; employeeId: string };
+  effectivePermission?: string;
 }
 
 interface FolderItem {
@@ -27,7 +32,16 @@ interface FolderItem {
   description: string | null;
   createdAt: string;
   createdBy: { fullName: string };
+  effectivePermission?: string;
 }
+
+const PERM_LEVELS: Record<string, number> = {
+  NONE: 0, VIEW: 1, DOWNLOAD: 2, MODIFY_ONLINE: 3, MODIFY: 4, DELETE: 5, UPLOAD: 6
+};
+
+const hasPerm = (effective: string | undefined, required: string) => {
+  return (PERM_LEVELS[effective || 'NONE'] || 0) >= (PERM_LEVELS[required] || 0);
+};
 
 const CATEGORIES = ["DOCUMENT", "SPREADSHEET", "PRESENTATION", "PDF", "IMAGE", "VIDEO", "OTHER"];
 
@@ -43,6 +57,11 @@ export default function Files() {
   const [isUploading, setIsUploading] = useState(false);
   const [sharingItem, setSharingItem] = useState<{ type: 'file'|'folder', item: any } | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [versionFile, setVersionFile] = useState<FileItem | null>(null);
+  const [moveCopyItem, setMoveCopyItem] = useState<{ file: FileItem, action: 'move'|'copy' } | null>(null);
+  const [detailsFile, setDetailsFile] = useState<FileItem | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -76,6 +95,12 @@ export default function Files() {
   useEffect(() => {
     loadData(currentFolderId);
   }, [currentFolderId]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   const visibleFiles = files.filter((file) => {
     const matchesSearch = file.originalName.toLowerCase().includes(search.toLowerCase());
@@ -275,8 +300,72 @@ export default function Files() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError("Failed to download file.");
+      toast.error("Failed to download file.");
     }
+  }
+
+  async function handleDelete(file: FileItem) {
+    if (!confirm("Are you sure you want to delete this file?")) return;
+    try {
+      await api.delete(`/files/${file.id}`);
+      toast.success("File moved to recycle bin");
+      loadData(currentFolderId);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to delete file");
+    }
+  }
+
+  function FileActions({ file }: { file: FileItem }) {
+    const perm = file.effectivePermission || 'NONE';
+    const canDownload = hasPerm(perm, 'DOWNLOAD');
+    const canModify = hasPerm(perm, 'MODIFY');
+    const canDelete = hasPerm(perm, 'DELETE');
+    const isOpen = activeDropdown === file.id;
+  
+    return (
+      <div className="relative" onClick={e => e.stopPropagation()}>
+        <button onClick={() => setActiveDropdown(isOpen ? null : file.id)} className="p-1 hover:bg-muted rounded text-muted-foreground transition-colors hover:text-foreground">
+          <MoreVertical className="size-4" />
+        </button>
+        {isOpen && (
+          <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-xl py-1.5 z-50 overflow-hidden">
+            <button onClick={() => { setActiveDropdown(null); setSharingItem({ type: 'file', item: file }); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+              <Share2 className="size-4 opacity-70" /> Share
+            </button>
+            {canDownload && (
+              <button onClick={() => { setActiveDropdown(null); handleDownload(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+                <Download className="size-4 opacity-70" /> Download
+              </button>
+            )}
+            <button onClick={() => { setActiveDropdown(null); setVersionFile(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+              <History className="size-4 opacity-70" /> Versions
+            </button>
+            <button onClick={() => { setActiveDropdown(null); setDetailsFile(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+              <Info className="size-4 opacity-70" /> Details
+            </button>
+            {canModify && (
+              <>
+                <div className="h-px bg-border my-1" />
+                <button onClick={() => { setActiveDropdown(null); setMoveCopyItem({ file, action: 'move' }); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+                  <MoveRight className="size-4 opacity-70" /> Move
+                </button>
+                <button onClick={() => { setActiveDropdown(null); setMoveCopyItem({ file, action: 'copy' }); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+                  <CopyPlus className="size-4 opacity-70" /> Copy
+                </button>
+              </>
+            )}
+            {canDelete && (
+              <>
+                <div className="h-px bg-border my-1" />
+                <button onClick={() => { setActiveDropdown(null); handleDelete(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-destructive/10 text-destructive flex items-center gap-2 font-medium">
+                  <Trash2 className="size-4 opacity-70" /> Delete
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -458,18 +547,8 @@ export default function Files() {
                       )}
                     </div>
                   </div>
-                  <div className="absolute top-2 right-2 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 hover:bg-muted rounded text-muted-foreground">
-                      <MoreVertical className="size-4" />
-                    </button>
-                  </div>
-                  <div className="flex gap-1.5 mt-3 pt-3 border-t border-border/50">
-                    <Button onClick={() => setSharingItem({ type: 'file', item: file })} size="sm" variant="ghost" className="flex-1 h-7 text-xs hover:bg-brand/10 hover:text-brand px-0">
-                      Share
-                    </Button>
-                    <Button onClick={() => handleDownload(file)} size="sm" variant="ghost" className="flex-1 h-7 text-xs hover:bg-brand/10 hover:text-brand px-0">
-                      Download
-                    </Button>
+                  <div className="absolute top-2 right-2 flex">
+                    <FileActions file={file} />
                   </div>
                 </div>
               ))}
@@ -531,12 +610,7 @@ export default function Files() {
                   <div className="hidden sm:block col-span-3 text-sm text-muted-foreground truncate">{file.uploadedBy.fullName}</div>
                   <div className="col-span-3 sm:col-span-2 text-sm text-muted-foreground">{formatFileSize(file.fileSize)}</div>
                   <div className="col-span-3 sm:col-span-2 text-right opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
-                    <Button onClick={() => setSharingItem({ type: 'file', item: file })} size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full hover:bg-brand/10 hover:text-brand" title="Share">
-                      <MoreVertical className="size-4" />
-                    </Button>
-                    <Button onClick={() => handleDownload(file)} size="sm" variant="ghost" className="h-7 px-2 text-xs rounded hover:bg-brand/10 hover:text-brand">
-                      Download
-                    </Button>
+                    <FileActions file={file} />
                   </div>
                 </div>
               ))}
@@ -560,6 +634,32 @@ export default function Files() {
           file={previewFile}
           onClose={() => setPreviewFile(null)}
           onDownload={handleDownload}
+        />
+      )}
+
+      {versionFile && (
+        <FileVersionModal
+          fileId={versionFile.id}
+          fileName={versionFile.originalName}
+          onClose={() => setVersionFile(null)}
+          onRestored={() => loadData(currentFolderId)}
+        />
+      )}
+
+      {moveCopyItem && (
+        <MoveCopyModal
+          fileId={moveCopyItem.file.id}
+          fileName={moveCopyItem.file.originalName}
+          action={moveCopyItem.action}
+          onClose={() => setMoveCopyItem(null)}
+          onSuccess={() => loadData(currentFolderId)}
+        />
+      )}
+
+      {detailsFile && (
+        <FileDetailsModal
+          file={detailsFile}
+          onClose={() => setDetailsFile(null)}
         />
       )}
     </div>

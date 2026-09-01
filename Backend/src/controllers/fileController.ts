@@ -28,6 +28,7 @@ export class FileController {
         this.hardDeleteFile = this.hardDeleteFile.bind(this);
         this.moveFile = this.moveFile.bind(this);
         this.copyFile = this.copyFile.bind(this);
+        this.getFileAccessLogs = this.getFileAccessLogs.bind(this);
     }
 
     async uploadFile(req: Request, res: Response, next: NextFunction) {
@@ -47,6 +48,13 @@ export class FileController {
                 
                 if (department && department.plantId !== validated.plantId) {
                     throw new AppError('Department does not belong to the specified plant', 400);
+                }
+            }
+
+            if (validated.folderId) {
+                const canUpload = await permissionService.hasPermission(req.user!.id, validated.folderId, 'FOLDER', 'UPLOAD');
+                if (!canUpload) {
+                    throw new AppError('You do not have permission to upload to this folder', 403);
                 }
             }
 
@@ -122,6 +130,9 @@ export class FileController {
             }
             if (req.user?.plantId) {
                 shareConditions.push({ sharedWithPlantId: req.user.plantId });
+            }
+            if (req.user?.sectionId) {
+                shareConditions.push({ sharedWithSectionId: req.user.sectionId });
             }
 
             const shareFilter = {
@@ -294,7 +305,7 @@ export class FileController {
                 throw new AppError('File not found', 404);
             }
 
-            const hasAccess = await this.fileService.canDownloadFile(req.user!.id, file.id);
+            const hasAccess = await this.fileService.canAccessFile(req.user!.id, file.id);
             if (!hasAccess) {
                 throw new AppError('You do not have permission to view this file', 403);
             }
@@ -556,6 +567,23 @@ export class FileController {
 
             logger.info(`File copied: ${file.fileName} (${id}) to folder ${newFolderId} by ${req.user?.employeeId}`);
             res.json(successResponse(copiedFile, 'File copied successfully'));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getFileAccessLogs(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            
+            const file = await prisma.file.findUnique({ where: { id: id as string } });
+            if (!file) throw new AppError('File not found', 404);
+
+            // Access logs check relies on route-level permission (UPLOAD), 
+            // but we can also add a secondary check here if needed.
+            
+            const logs = await this.fileService.getFileAccessLogs(id as string);
+            res.json(successResponse(logs));
         } catch (error) {
             next(error);
         }

@@ -3,9 +3,10 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit2, Trash2, FileSpreadsheet } from "lucide-react";
+import { Plus, Edit2, Trash2, FileSpreadsheet, Download, KeyRound } from "lucide-react";
 import UserModal, { type User } from "@/components/users/UserModal";
 import ImportUsersModal from "@/components/users/ImportUsersModal";
+import AdminResetPasswordModal from "@/components/users/AdminResetPasswordModal";
 
 const ROLE_STYLES: Record<string, string> = {
   SUPER_ADMIN: "bg-[var(--brand)]/15 text-[var(--brand)]",
@@ -32,6 +33,7 @@ export default function UsersList() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
 
@@ -54,6 +56,25 @@ export default function UsersList() {
     fetchUsers();
   }, [fetchUsers]);
 
+  const handleExport = async () => {
+    try {
+      const response = await api.get(`/users/bulk-export?status=${statusFilter}`, {
+        responseType: 'blob',
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'users_export.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? "Failed to export users.");
+    }
+  };
+
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
@@ -72,6 +93,11 @@ export default function UsersList() {
   const openEditModal = (user: User) => {
     setSelectedUser(user);
     setIsModalOpen(true);
+  };
+
+  const openResetPasswordModal = (user: User) => {
+    setSelectedUser(user);
+    setIsResetPasswordOpen(true);
   };
 
   return (
@@ -99,6 +125,9 @@ export default function UsersList() {
             <div className="flex gap-2">
               <Button onClick={() => setIsImportModalOpen(true)} variant="outline" className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" /> Import Users
+              </Button>
+              <Button onClick={handleExport} variant="outline" className="gap-2">
+                <Download className="h-4 w-4" /> Export Users
               </Button>
               <Button onClick={openAddModal} className="gap-2 bg-[var(--brand)] text-white hover:opacity-90">
                 <Plus className="h-4 w-4" /> Add User
@@ -187,6 +216,18 @@ export default function UsersList() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {canManageUsers && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => openResetPasswordModal(u)}
+                          className="h-8 px-2 text-muted-foreground hover:text-[var(--brand)]"
+                          title="Reset Password"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                          <span className="sr-only">Reset Password</span>
+                        </Button>
+                      )}
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -230,6 +271,16 @@ export default function UsersList() {
           onClose={() => setIsImportModalOpen(false)}
           onSuccess={() => {
             fetchUsers();
+          }}
+        />
+      )}
+
+      {isResetPasswordOpen && selectedUser && (
+        <AdminResetPasswordModal
+          user={selectedUser}
+          onClose={() => setIsResetPasswordOpen(false)}
+          onSuccess={() => {
+            setIsResetPasswordOpen(false);
           }}
         />
       )}

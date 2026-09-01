@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Share2, FileText, Folder, User, Users, Factory, Trash2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Share {
   id: string;
@@ -12,9 +13,11 @@ interface Share {
   sharedWithUser?: { fullName: string };
   sharedWithDept?: { name: string };
   sharedWithPlant?: { name: string };
+  sharedBy: string;
 }
 
 export default function Shares() {
+  const { user } = useAuth();
   const [shares, setShares] = useState<Share[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -122,14 +125,16 @@ export default function Shares() {
                     </div>
                   </div>
                 </div>
-                <Button
-                  onClick={() => handleRevoke(share.id)}
-                  variant="outline"
-                  className="w-full sm:w-auto border-destructive/20 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 group-hover:border-destructive/40 bg-destructive/5"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Revoke Access
-                </Button>
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'PLANT_ADMIN' || share.sharedBy === user?.id) && (
+                  <Button
+                    onClick={() => handleRevoke(share.id)}
+                    variant="outline"
+                    className="w-full sm:w-auto border-destructive/20 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 group-hover:border-destructive/40 bg-destructive/5"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Revoke Access
+                  </Button>
+                )}
               </div>
             );
           })}

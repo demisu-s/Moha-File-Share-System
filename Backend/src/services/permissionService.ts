@@ -50,10 +50,10 @@ export class PermissionService {
             let localOverrideFound = false;
             for (const share of shares) {
                 if (
-                    share.sharedWithUserId === user.id ||
-                    share.sharedWithPlantId === user.plantId ||
-                    share.sharedWithDeptId === user.departmentId ||
-                    share.sharedWithSectionId === user.sectionId
+                    (share.sharedWithUserId && share.sharedWithUserId === user.id) ||
+                    (share.sharedWithPlantId && share.sharedWithPlantId === user.plantId) ||
+                    (share.sharedWithDeptId && share.sharedWithDeptId === user.departmentId) ||
+                    (share.sharedWithSectionId && share.sharedWithSectionId === user.sectionId)
                 ) {
                     updateMax(share.permission);
                     if (share.isOverride) {

@@ -334,4 +334,22 @@ export class FileService {
             stream.on('error', reject);
         });
     }
+
+    async getFileAccessLogs(fileId: string) {
+        return prisma.fileAccessLog.findMany({
+            where: { fileId },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        employeeId: true,
+                        profileImage: true
+                    }
+                }
+            },
+            orderBy: { accessedAt: 'desc' }
+        });
+    }
 }

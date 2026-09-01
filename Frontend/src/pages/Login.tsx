@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,18 @@ export default function Login() {
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(""), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // Clear error if user starts typing again to fix their mistake
+  useEffect(() => {
+    if (error) setError("");
+  }, [employeeId, password]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -22,7 +34,12 @@ export default function Login() {
       await login(employeeId, password);
       navigate("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Incorrect password");
+      if (err.response?.data?.requiresPasswordChange) {
+        localStorage.setItem("tempToken", err.response.data.tempToken);
+        navigate("/force-change-password");
+        return;
+      }
+      setError(err.response?.data?.error || "Login failed");
     }
   }
 
@@ -68,10 +85,19 @@ export default function Login() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="text-sm font-medium text-foreground">
-                Password
-              </label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-sm font-medium text-foreground">
+                  Password
+                </label>
+                <button 
+                  type="button" 
+                  onClick={() => navigate('/forgot-password')} 
+                  className="text-sm font-medium text-[var(--brand)] hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div className="relative">
                 <Input
                   id="password"

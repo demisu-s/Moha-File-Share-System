@@ -104,4 +104,11 @@ router.post(
     fileController.copyFile
 );
 
+router.get(
+    '/:id/activity',
+    authenticate,
+    requirePermission('FILE', 'UPLOAD'), // Only share/full control permissions can view activity
+    fileController.getFileAccessLogs
+);
+
 export default router;

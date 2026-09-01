@@ -86,7 +86,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background">
-      <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 border-r border-border bg-card">
+      <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 border-r border-border bg-card print:hidden">
         {sidebarContent}
       </aside>
 
@@ -100,7 +100,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-brand flex items-center justify-between px-4 sm:px-6 shrink-0">
+        <header className="h-16 bg-brand flex items-center justify-between px-4 sm:px-6 shrink-0 print:hidden">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden text-white shrink-0">
               <Menu className="size-5" />

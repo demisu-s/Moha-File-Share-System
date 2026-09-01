@@ -8,7 +8,8 @@ import FilePreviewModal from "@/components/ui/FilePreviewModal";
 import FileVersionModal from "@/components/ui/FileVersionModal";
 import MoveCopyModal from "@/components/ui/MoveCopyModal";
 import FileDetailsModal from "@/components/ui/FileDetailsModal";
-import { LayoutGrid, List, Search, UploadCloud, Folder, ChevronRight, History, MoreVertical, FileText, Trash2, MoveRight, CopyPlus, Share2, Download, Info } from "lucide-react";
+import FileActivityModal from "@/components/ui/FileActivityModal";
+import { LayoutGrid, List, Search, UploadCloud, Folder, ChevronRight, History, MoreVertical, FileText, Trash2, MoveRight, CopyPlus, Share2, Download, Info, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +23,7 @@ interface FileItem {
   description: string | null;
   createdAt: string;
   version: number;
-  uploadedBy: { fullName: string; employeeId: string };
+  uploadedBy: { id: string; fullName: string; employeeId: string };
   effectivePermission?: string;
 }
 
@@ -31,7 +32,7 @@ interface FolderItem {
   name: string;
   description: string | null;
   createdAt: string;
-  createdBy: { fullName: string };
+  createdBy: { id: string; fullName: string };
   effectivePermission?: string;
 }
 
@@ -60,6 +61,7 @@ export default function Files() {
   const [versionFile, setVersionFile] = useState<FileItem | null>(null);
   const [moveCopyItem, setMoveCopyItem] = useState<{ file: FileItem, action: 'move'|'copy' } | null>(null);
   const [detailsFile, setDetailsFile] = useState<FileItem | null>(null);
+  const [activityFile, setActivityFile] = useState<FileItem | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -320,6 +322,7 @@ export default function Files() {
     const canDownload = hasPerm(perm, 'DOWNLOAD');
     const canModify = hasPerm(perm, 'MODIFY');
     const canDelete = hasPerm(perm, 'DELETE');
+    const canShare = user?.role === 'SUPER_ADMIN' || user?.role === 'PLANT_ADMIN' || file.uploadedBy.id === user?.id || hasPerm(perm, 'UPLOAD');
     const isOpen = activeDropdown === file.id;
   
     return (
@@ -329,9 +332,11 @@ export default function Files() {
         </button>
         {isOpen && (
           <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-xl py-1.5 z-50 overflow-hidden">
-            <button onClick={() => { setActiveDropdown(null); setSharingItem({ type: 'file', item: file }); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
-              <Share2 className="size-4 opacity-70" /> Share
-            </button>
+            {canShare && (
+              <button onClick={() => { setActiveDropdown(null); setSharingItem({ type: 'file', item: file }); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+                <Share2 className="size-4 opacity-70" /> Share
+              </button>
+            )}
             {canDownload && (
               <button onClick={() => { setActiveDropdown(null); handleDownload(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
                 <Download className="size-4 opacity-70" /> Download
@@ -343,6 +348,11 @@ export default function Files() {
             <button onClick={() => { setActiveDropdown(null); setDetailsFile(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
               <Info className="size-4 opacity-70" /> Details
             </button>
+            {canShare && (
+              <button onClick={() => { setActiveDropdown(null); setActivityFile(file); }} className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2">
+                <Eye className="size-4 opacity-70" /> Activity
+              </button>
+            )}
             {canModify && (
               <>
                 <div className="h-px bg-border my-1" />
@@ -519,9 +529,11 @@ export default function Files() {
                     <Folder className="size-6 fill-current opacity-80" />
                   </div>
                   <div className="absolute top-2 right-2 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                    <Button onClick={(e) => { e.stopPropagation(); setSharingItem({ type: 'folder', item: folder }); }} size="sm" variant="ghost" className="h-7 px-2 text-xs hover:bg-brand/10 hover:text-brand" title="Share folder">
-                      Share
-                    </Button>
+                    {(user?.role === 'SUPER_ADMIN' || user?.role === 'PLANT_ADMIN' || folder.createdBy.id === user?.id) && (
+                      <Button onClick={(e) => { e.stopPropagation(); setSharingItem({ type: 'folder', item: folder }); }} size="sm" variant="ghost" className="h-7 px-2 text-xs hover:bg-brand/10 hover:text-brand" title="Share folder">
+                        Share
+                      </Button>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-foreground truncate">{folder.name}</p>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">Folder</p>
@@ -589,7 +601,9 @@ export default function Files() {
                   <div className="hidden sm:block col-span-3 text-sm text-muted-foreground truncate">{folder.createdBy.fullName}</div>
                   <div className="col-span-3 sm:col-span-2 text-sm text-muted-foreground">-</div>
                   <div className="col-span-3 sm:col-span-2 text-right opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-1">
-                    <Button onClick={(e) => { e.stopPropagation(); setSharingItem({ type: 'folder', item: folder }); }} size="sm" variant="ghost" className="h-7 px-2 text-xs rounded hover:bg-brand/10 hover:text-brand">Share</Button>
+                    {(user?.role === 'SUPER_ADMIN' || user?.role === 'PLANT_ADMIN' || folder.createdBy.id === user?.id) && (
+                      <Button onClick={(e) => { e.stopPropagation(); setSharingItem({ type: 'folder', item: folder }); }} size="sm" variant="ghost" className="h-7 px-2 text-xs rounded hover:bg-brand/10 hover:text-brand">Share</Button>
+                    )}
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigateToFolder(folder.id, folder.name)}>Open</Button>
                   </div>
                 </div>
@@ -660,6 +674,13 @@ export default function Files() {
         <FileDetailsModal
           file={detailsFile}
           onClose={() => setDetailsFile(null)}
+        />
+      )}
+
+      {activityFile && (
+        <FileActivityModal
+          file={activityFile}
+          onClose={() => setActivityFile(null)}
         />
       )}
     </div>

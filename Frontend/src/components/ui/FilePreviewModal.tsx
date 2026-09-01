@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { X, Loader2, Download, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
+import "@cyntler/react-doc-viewer/dist/index.css";
 
 interface FileItem {
   id: string;
@@ -23,15 +25,10 @@ export default function FilePreviewModal({ file, onClose, onDownload }: FilePrev
   const ext = file.originalName.split('.').pop()?.toLowerCase() || '';
   const isImage = file.category === "IMAGE" || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
   const isVideo = file.category === "VIDEO" || ['mp4', 'webm', 'ogg'].includes(ext);
-  const isPdf = file.category === "PDF" || ext === 'pdf';
-  const isPreviewable = isImage || isVideo || isPdf;
-
-  let previewType = file.category;
-  if (previewType === "OTHER") {
-    if (isImage) previewType = "IMAGE";
-    else if (isVideo) previewType = "VIDEO";
-    else if (isPdf) previewType = "PDF";
-  }
+  
+  // react-doc-viewer uses Microsoft Office Online for DOCX/PPTX/XLSX which fails on localhost or authenticated files.
+  const isOfficeFile = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls'].includes(ext);
+  const isPreviewable = !isOfficeFile;
 
   useEffect(() => {
     let url: string | null = null;
@@ -99,16 +96,31 @@ export default function FilePreviewModal({ file, onClose, onDownload }: FilePrev
       );
     }
 
-    switch (previewType) {
-      case "IMAGE":
-        return <img src={blobUrl!} alt={file.originalName} className="max-w-full max-h-full object-contain mx-auto" />;
-      case "VIDEO":
-        return <video src={blobUrl!} controls className="max-w-full max-h-full mx-auto" />;
-      case "PDF":
-        return <iframe src={blobUrl!} title={file.originalName} className="w-full h-full border-0 rounded-b-xl" />;
-      default:
-        return null; // Handled above
+    if (isImage) {
+      return <img src={blobUrl!} alt={file.originalName} className="max-w-full max-h-full object-contain mx-auto" />;
     }
+    if (isVideo) {
+      return <video src={blobUrl!} controls className="max-w-full max-h-full mx-auto" />;
+    }
+
+    const docs = [{ uri: blobUrl!, fileName: file.originalName }];
+    
+    return (
+      <div className="w-full h-full overflow-hidden rounded-b-xl bg-white">
+        <DocViewer
+          documents={docs}
+          pluginRenderers={DocViewerRenderers}
+          style={{ width: '100%', height: '100%' }}
+          config={{
+            header: {
+              disableHeader: true,
+              disableFileName: true,
+              retainURLParams: false
+            }
+          }}
+        />
+      </div>
+    );
   };
 
   return (

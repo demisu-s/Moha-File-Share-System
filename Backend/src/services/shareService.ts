@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { permissionService } from './permissionService';
 
 export class ShareService {
     async createShares(data: {
@@ -65,6 +66,23 @@ export class ShareService {
                     }
                 });
                 createdShares.push(share);
+            } else if (existingShare.permission !== (data.permission || 'VIEW')) {
+                const updatedShare = await prisma.fileShare.update({
+                    where: { id: existingShare.id },
+                    data: {
+                        permission: data.permission as any || 'VIEW',
+                        expiresAt: data.expiresAt ? new Date(data.expiresAt) : existingShare.expiresAt
+                    },
+                    include: {
+                        file: { select: { id: true, fileName: true, originalName: true } },
+                        folder: { select: { id: true, name: true } },
+                        sharedWithUser: { select: { id: true, fullName: true, email: true } },
+                        sharedWithPlant: { select: { id: true, name: true, code: true } },
+                        sharedWithDept: { select: { id: true, name: true, code: true } },
+                        sharedWithSection: { select: { id: true, name: true } }
+                    }
+                });
+                createdShares.push(updatedShare);
             }
         }
 
@@ -242,6 +260,10 @@ export class ShareService {
             if (file.uploadedById === userId) return true;
             if (user.role === 'PLANT_ADMIN' && user.plantId === file.plantId) return true;
             if (user.role === 'DEPARTMENT_HEAD' && user.departmentId === file.departmentId) return true;
+            
+            // Check if user has UPLOAD (Share/Full Control) permission on the file
+            const hasUploadPerm = await permissionService.hasPermission(userId, fileId, 'FILE', 'UPLOAD');
+            if (hasUploadPerm) return true;
         } else if (folderId) {
             const folder = await prisma.folder.findUnique({
                 where: { id: folderId },
@@ -251,6 +273,10 @@ export class ShareService {
             if (folder.createdById === userId) return true;
             if (user.role === 'PLANT_ADMIN' && user.plantId === folder.plantId) return true;
             if (user.role === 'DEPARTMENT_HEAD' && user.departmentId === folder.departmentId) return true;
+            
+            // Check if user has UPLOAD (Share/Full Control) permission on the folder
+            const hasUploadPerm = await permissionService.hasPermission(userId, folderId, 'FOLDER', 'UPLOAD');
+            if (hasUploadPerm) return true;
         }
 
         return false;

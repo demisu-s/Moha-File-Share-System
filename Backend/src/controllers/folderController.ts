@@ -22,7 +22,13 @@ export class FolderController {
             if (!name) {
                 throw new AppError('Name is required', 400);
             }
-            // Add permission check to see if user can upload (Level 6) in this scope. For now, checking later.
+            if (parentFolderId) {
+                const canUpload = await permissionService.hasPermission(req.user!.id, parentFolderId, 'FOLDER', 'UPLOAD');
+                if (!canUpload) {
+                    throw new AppError('You do not have permission to create folders in this location', 403);
+                }
+            }
+
             const folder = await this.folderService.createFolder({
                 name, description, plantId, departmentId, sectionId, parentFolderId, createdById: req.user!.id
             });
@@ -73,6 +79,9 @@ export class FolderController {
             }
             if (req.user?.plantId) {
                 shareConditions.push({ sharedWithPlantId: req.user.plantId });
+            }
+            if (req.user?.sectionId) {
+                shareConditions.push({ sharedWithSectionId: req.user.sectionId });
             }
 
             const shareFilter = {

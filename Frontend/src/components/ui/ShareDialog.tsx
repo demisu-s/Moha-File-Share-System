@@ -268,10 +268,10 @@ export default function ShareDialog({ fileId, folderId, itemName, onClose, onSha
       }));
 
       let finalPermission = "VIEW";
-      if (permissionsState.fullControl) finalPermission = "FULL_CONTROL";
-      else if (permissionsState.share) finalPermission = "SHARE";
+      if (permissionsState.fullControl) finalPermission = "UPLOAD";
+      else if (permissionsState.share) finalPermission = "UPLOAD"; // Highest level for sharing
       else if (permissionsState.delete) finalPermission = "DELETE";
-      else if (permissionsState.edit) finalPermission = "EDIT";
+      else if (permissionsState.edit) finalPermission = "MODIFY";
 
       await api.post("/shares", {
         fileId,

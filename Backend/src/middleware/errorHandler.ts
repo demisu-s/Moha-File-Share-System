@@ -59,9 +59,11 @@ export const errorHandler = (
 
     // Handle validation errors
     if (err.name === 'ZodError') {
+        const zodError = err as any;
+        const firstError = zodError.errors?.[0]?.message || 'Validation failed';
         return res.status(400).json({
-            error: 'Validation failed',
-            details: (err as any).errors
+            error: firstError,
+            details: zodError.errors
         });
     }
 

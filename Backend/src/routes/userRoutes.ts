@@ -23,6 +23,13 @@ router.get(
     userController.downloadImportTemplate
 );
 
+router.get(
+    '/bulk-export',
+    authenticate,
+    authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
+    userController.bulkExportUsers
+);
+
 router.post(
     '/bulk-import',
     authenticate,
@@ -55,6 +62,13 @@ router.put(
     authenticate,
     authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
     userController.updateUser
+);
+
+router.post(
+    '/:id/reset-password',
+    authenticate,
+    authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PLANT_ADMIN, ROLES.DEPARTMENT_HEAD),
+    userController.resetUserPassword
 );
 
 router.delete(

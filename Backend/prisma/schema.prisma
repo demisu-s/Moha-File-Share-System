@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -120,6 +120,8 @@ model User {
   accountStatus   String    @default("ACTIVE")
   lastLogin       DateTime?
   lastFailedLogin DateTime?
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
   createdAt       DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -143,6 +145,7 @@ model User {
   notifications  Notification[]
   auditLogs      AuditLog[]
   fileAccessLogs FileAccessLog[]
+  passwordResetTokens PasswordResetToken[]
 
   // Created by
   createdBy String?
@@ -273,8 +276,19 @@ model AuditLog {
   resourceId   String?
   details      Json
   ipAddress    String?
-  userAgent    String?
   createdAt    DateTime     @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  requestIp String?
+  userAgent String?
+  createdAt DateTime @default(now())
 }
 
 // ============ ENUMS ============

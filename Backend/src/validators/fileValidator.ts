@@ -15,7 +15,7 @@ export const fileShareSchema = z.object({
         type: z.enum(['USER', 'PLANT', 'DEPARTMENT', 'SECTION']),
         id: z.string()
     })).min(1, 'Must specify at least one share target'),
-    permission: z.enum(['VIEW', 'EDIT', 'DELETE', 'SHARE', 'FULL_CONTROL']).default('VIEW'),
+    permission: z.enum(['VIEW', 'DOWNLOAD', 'MODIFY', 'MODIFY_ONLINE', 'DELETE', 'UPLOAD']).default('VIEW'),
     expiresAt: z.string().datetime().optional()
 }).refine(
     (data) => {

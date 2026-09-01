@@ -3,7 +3,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, B
 import { api } from "@/lib/api";
 import { formatFileSize, categoryIcon } from "@/lib/format";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Database, FileDigit, Users as UsersIcon, Clock, HardDrive } from "lucide-react";
+import { Database, FileDigit, Users as UsersIcon, Clock, HardDrive, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface StorageStats {
@@ -92,10 +92,20 @@ export default function Reports() {
 
   return (
     <div className="p-4 sm:p-8 max-w-6xl mx-auto pb-24">
-      <h1 className="text-2xl font-bold tracking-tight text-foreground mb-6 flex items-center gap-2">
-        <Database className="size-6 text-brand" />
-        System Reports & Analytics
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Database className="size-6 text-brand" />
+          System Reports & Analytics
+        </h1>
+        <Button 
+          onClick={() => window.print()} 
+          className="print:hidden flex items-center gap-2"
+          variant="outline"
+        >
+          <Printer className="size-4" />
+          Export as PDF
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Storage Summary */}

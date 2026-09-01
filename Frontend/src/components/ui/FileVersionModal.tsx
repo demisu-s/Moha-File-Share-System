@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { formatFileSize } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { History, X, Download, RotateCcw } from "lucide-react";
+import { History, X, Download, RotateCcw, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
+import { useRef } from "react";
 
 interface FileVersion {
   id: string;
@@ -24,17 +25,23 @@ interface Props {
 export default function FileVersionModal({ fileId, fileName, onClose, onRestored }: Props) {
   const [versions, setVersions] = useState<FileVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const fetchVersions = () => {
+    setIsLoading(true);
     api.get(`/files/${fileId}/versions`)
       .then((res) => {
         setVersions(res.data.data);
-        setIsLoading(false);
       })
       .catch((err) => {
         toast.error(err.response?.data?.error || "Failed to load versions");
-        setIsLoading(false);
-      });
+      })
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchVersions();
   }, [fileId]);
 
   const handleRestore = async (versionId: string) => {
@@ -43,9 +50,32 @@ export default function FileVersionModal({ fileId, fileName, onClose, onRestored
       await api.post(`/files/${fileId}/versions/${versionId}/restore`);
       toast.success("Version restored successfully");
       onRestored();
-      onClose();
+      fetchVersions();
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Failed to restore version");
+    }
+  };
+
+  const handleUploadNewVersion = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      await api.post(`/files/${fileId}/versions`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("New version uploaded successfully");
+      onRestored();
+      fetchVersions();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to upload new version");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -62,9 +92,26 @@ export default function FileVersionModal({ fileId, fileName, onClose, onRestored
               <p className="text-xs text-muted-foreground">{fileName}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground">
-            <X className="size-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              onChange={handleUploadNewVersion} 
+            />
+            <Button 
+              onClick={() => fileInputRef.current?.click()} 
+              disabled={isUploading} 
+              size="sm"
+              className="bg-brand hover:bg-brand/90 text-white gap-2"
+            >
+              <UploadCloud className="size-4" />
+              {isUploading ? "Uploading..." : "New Version"}
+            </Button>
+            <button onClick={onClose} className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground">
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
         
         <div className="p-5 overflow-y-auto flex-1 bg-muted/10">

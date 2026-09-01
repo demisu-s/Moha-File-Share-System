@@ -84,6 +84,48 @@ export class FileService {
         return file;
     }
 
+    async uploadFileVersion(fileId: string, fileData: Express.Multer.File, userId: string) {
+        const existingFile = await prisma.file.findUnique({
+            where: { id: fileId }
+        });
+
+        if (!existingFile) {
+            throw new AppError('File not found', 404);
+        }
+
+        const fileHash = await this.calculateFileHash(fileData.path);
+
+        // Backup current version
+        await prisma.fileVersion.create({
+            data: {
+                fileId: existingFile.id,
+                versionNumber: existingFile.version,
+                filePath: existingFile.filePath,
+                fileSize: existingFile.fileSize,
+                originalName: existingFile.originalName,
+                fileHash: existingFile.fileHash,
+                uploadedById: existingFile.uploadedById
+            }
+        });
+
+        // Update file to new version
+        return prisma.file.update({
+            where: { id: existingFile.id },
+            data: {
+                fileName: fileData.filename,
+                originalName: fileData.originalname,
+                fileSize: fileData.size,
+                fileType: path.extname(fileData.originalname).slice(1),
+                mimeType: fileData.mimetype,
+                filePath: fileData.filename,
+                fileHash: fileHash,
+                version: existingFile.version + 1,
+                uploadedById: userId,
+                updatedAt: new Date()
+            }
+        });
+    }
+
     async getFiles(where: any, page: number, limit: number) {
         const skip = (page - 1) * limit;
 

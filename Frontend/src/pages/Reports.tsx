@@ -49,6 +49,7 @@ export default function Reports() {
   const [staleFiles, setStaleFiles] = useState<StaleFile[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [staleMonths, setStaleMonths] = useState(6);
+  const [activeUserDays, setActiveUserDays] = useState(30);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function Reports() {
           api.get("/reports/storage"),
           api.get("/reports/active-files"),
           api.get(`/reports/stale-files?months=${staleMonths}`),
-          api.get("/reports/active-users"),
+          api.get(`/reports/active-users?period=${activeUserDays}`),
         ]);
         
         setStorage(storageRes.data.data);
@@ -74,7 +75,7 @@ export default function Reports() {
     };
     
     fetchReports();
-  }, [staleMonths]);
+  }, [staleMonths, activeUserDays]);
 
   if (loading && !storage) {
     return (
@@ -237,9 +238,22 @@ export default function Reports() {
 
       {/* Active Users */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm transition-all duration-200 hover:shadow-md hover:border-brand/40">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <UsersIcon className="size-5 text-blue-500" />
-          User Activity (30 days)
+        <h2 className="text-lg font-semibold mb-4 flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <UsersIcon className="size-5 text-blue-500" />
+            User Activity
+          </span>
+          <div className="flex gap-1 bg-muted p-1 rounded-md">
+            {[7, 30, 90].map(d => (
+              <button 
+                key={d}
+                onClick={() => setActiveUserDays(d)}
+                className={`text-xs px-2 py-1 rounded-md transition-colors ${activeUserDays === d ? 'bg-background shadow-sm font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -276,7 +290,7 @@ export default function Reports() {
               {activeUsers.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                    No active users in the last 30 days.
+                    No active users in the selected period.
                   </td>
                 </tr>
               )}

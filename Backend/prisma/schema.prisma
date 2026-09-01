@@ -350,6 +350,7 @@ enum ResourceType {
   FILE
   SHARE
   PERMISSION
+  SYSTEM_SETTINGS
 }
 
 // ============ PERMISSION SYSTEM ============

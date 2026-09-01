@@ -20,7 +20,23 @@ const forgotPasswordLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-router.post('/login', async (req, res, next) => {
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 10, // Limit each IP to 10 login requests per `window`
+    message: 'Too many login attempts from this IP, please try again after 15 minutes',
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+});
+
+const resetPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 5, // Limit each IP to 5 reset password requests per `window`
+    message: 'Too many password reset attempts from this IP, please try again after 15 minutes',
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+});
+
+router.post('/login', loginLimiter, async (req, res, next) => {
     try {
         const validated = loginSchema.parse(req.body);
         
@@ -236,7 +252,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res, next) =>
     }
 });
 
-router.post('/reset-password', async (req, res, next) => {
+router.post('/reset-password', resetPasswordLimiter, async (req, res, next) => {
     try {
         const validated = resetPasswordSchema.parse(req.body);
         const tokenHash = crypto.createHash('sha256').update(validated.token).digest('hex');

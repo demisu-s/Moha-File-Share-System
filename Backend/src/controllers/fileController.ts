@@ -22,6 +22,7 @@ export class FileController {
         this.updateFile = this.updateFile.bind(this);
         this.deleteFile = this.deleteFile.bind(this);
         this.getFileVersions = this.getFileVersions.bind(this);
+        this.uploadFileVersion = this.uploadFileVersion.bind(this);
         this.restoreFileVersion = this.restoreFileVersion.bind(this);
         this.getRecycleBin = this.getRecycleBin.bind(this);
         this.restoreFile = this.restoreFile.bind(this);
@@ -261,6 +262,46 @@ export class FileController {
 
             const versions = await this.fileService.getFileVersions(id as string);
             res.json(successResponse(versions));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async uploadFileVersion(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            
+            if (!req.file) {
+                throw new AppError('No file uploaded', 400);
+            }
+
+            const file = await prisma.file.findUnique({ where: { id: id as string } });
+            if (!file) {
+                throw new AppError('File not found', 404);
+            }
+
+            const hasAccess = await this.fileService.canManageFile(req.user!.id, file.id);
+            if (!hasAccess) {
+                throw new AppError('You do not have permission to upload a new version for this file', 403);
+            }
+
+            const updatedFile = await this.fileService.uploadFileVersion(id as string, req.file, req.user!.id);
+
+            prisma.auditLog.create({
+                data: {
+                    userId: req.user!.id,
+                    action: 'UPLOAD_VERSION',
+                    resourceType: 'FILE',
+                    resourceId: file.id,
+                    details: {
+                        fileName: updatedFile.fileName,
+                        newVersion: updatedFile.version
+                    }
+                }
+            }).catch(err => logger.error('Audit log failed on version upload:', err));
+
+            logger.info(`File version uploaded: ${updatedFile.fileName} (${updatedFile.id}) by ${req.user?.employeeId}`);
+            res.status(201).json(successResponse(updatedFile, 'New version uploaded successfully'));
         } catch (error) {
             next(error);
         }

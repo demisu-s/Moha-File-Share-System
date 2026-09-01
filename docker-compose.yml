@@ -7,10 +7,10 @@ services:
     restart: always
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: moha_file_share
-      MYSQL_USER: appuser
-      MYSQL_PASSWORD: apppassword
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-moha_file_share}
+      MYSQL_USER: ${MYSQL_USER:-appuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppassword}
     ports:
       - "3306:3306"
     volumes:
@@ -32,8 +32,8 @@ services:
     env_file:
       - ./Backend/.env.example # Change this to .env for production
     environment:
-      - DATABASE_URL=mysql://appuser:apppassword@mysql:3306/moha_file_share
-      - FRONTEND_URL=http://localhost:5173
+      - DATABASE_URL=mysql://${MYSQL_USER:-appuser}:${MYSQL_PASSWORD:-apppassword}@mysql:3306/${MYSQL_DATABASE:-moha_file_share}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs

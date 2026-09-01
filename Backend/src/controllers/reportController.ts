@@ -106,13 +106,16 @@ export class ReportController {
 
     async getActiveUsers(req: Request, res: Response, next: NextFunction) {
         try {
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const { period } = req.query;
+            const days = parseInt(period as string) || 30;
+            
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
             
             const activeUsers = await prisma.user.findMany({
                 where: {
                     isActive: true,
-                    lastLogin: { gte: thirtyDaysAgo }
+                    lastLogin: { gte: cutoffDate }
                 },
                 select: {
                     id: true,

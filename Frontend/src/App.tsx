@@ -23,6 +23,8 @@ import Settings from "@/pages/Settings";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import ForceChangePassword from "@/pages/ForceChangePassword";
+import Folders from "@/pages/Folders";
+import Sections from "@/pages/Sections";
 
 interface Stats {
   totalUsers: number;
@@ -371,7 +373,7 @@ function App() {
             <Route
               path="/reports"
               element={
-                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "PLANT_ADMIN"]}>
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN"]}>
                   <Reports />
                 </ProtectedRoute>
               }
@@ -401,9 +403,25 @@ function App() {
               }
             />
             <Route
+              path="/sections"
+              element={
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN", "PLANT_ADMIN", "DEPARTMENT_HEAD", "SECTION_HEAD"]}>
+                  <Sections />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/folders"
+              element={
+                <ProtectedRoute>
+                  <Folders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/settings"
               element={
-                <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+                <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
                   <Settings />
                 </ProtectedRoute>
               }

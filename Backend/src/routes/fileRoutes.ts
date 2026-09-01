@@ -70,6 +70,14 @@ router.get(
 );
 
 router.post(
+    '/:id/versions',
+    authenticate,
+    uploadSingle,
+    requirePermission('FILE', 'MODIFY'),
+    fileController.uploadFileVersion
+);
+
+router.post(
     '/:id/versions/:versionId/restore',
     authenticate,
     requirePermission('FILE', 'MODIFY'),

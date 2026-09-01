@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   mysql:
     image: mysql:8.0
@@ -19,5 +21,38 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build: 
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: moha-file-share-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./Backend/.env.example # Change this to .env for production
+    environment:
+      - DATABASE_URL=mysql://appuser:apppassword@mysql:3306/moha_file_share
+      - FRONTEND_URL=http://localhost:5173
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: moha-file-share-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
 volumes:
   mysql_data:
+  backend_uploads:
+  backend_logs:
